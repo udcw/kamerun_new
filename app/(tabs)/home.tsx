@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import React from 'react';
-import { FlatList, ImageBackground, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { FlatList, ImageBackground, ScrollView, StyleSheet, Text, TouchableOpacity, View, } from 'react-native';
 
 const newsData = [
   {
@@ -25,6 +25,7 @@ export default function HomeScreen() {
 
   const renderItem = ({ item }: { item: { id: string; title: string; description: string } }) => {
     return (
+      
       <TouchableOpacity style={styles.card} onPress={() => alert(item.title)}>
         <Text style={styles.cardTitle}>{item.title}</Text>
         <Text style={styles.cardDescription}>{item.description}</Text>
@@ -100,3 +101,20 @@ const styles = StyleSheet.create({
     color: '#333',
   },
 });
+
+// import React from 'react';
+// import { Button, StyleSheet, Text, View } from 'react-native';
+
+// export default function HomeScreen({ navigation }: any) {
+//   return (
+//     <View style={styles.container}>
+//       <Text style={styles.title}>Bienvenue sur la Home Page</Text>
+//       <Button title="Ouvrir le menu" onPress={() => navigation.openDrawer()} />
+//     </View>
+//   );
+// }
+
+// const styles = StyleSheet.create({
+//   container: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+//   title: { fontSize: 22, fontWeight: '700' },
+// });
