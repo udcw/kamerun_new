@@ -1,10 +1,10 @@
 // @ts-ignore
 import { useRouter } from 'expo-router';
-import React from 'react';
-import { FlatList, ImageBackground, ScrollView, StyleSheet, Text, TouchableOpacity, View, Dimensions, Alert } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { FlatList, ImageBackground, ScrollView, StyleSheet, Text, TouchableOpacity, View, Dimensions, Alert, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-
-const { width } = Dimensions.get('window');
+import { auth, db } from '../../firebase/kamerun';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
 
 const newsData = [
   {
@@ -39,8 +39,46 @@ const newsData = [
 
 export default function HomeScreen() {
   const router = useRouter();
+  const [user, setUser] = useState<any>(null);
+  const [isPremium, setIsPremium] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(true);
 
-  const handlePayment = () => {
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged(async (user) => {
+      setUser(user);
+      if (user) {
+        // Vérifier le statut premium
+        const userDoc = await getDoc(doc(db, 'users', user.uid));
+        if (userDoc.exists()) {
+          setIsPremium(userDoc.data().isPremium || false);
+        }
+      } else {
+        setIsPremium(false);
+      }
+      setLoading(false);
+    });
+    return unsubscribe;
+  }, []);
+
+  const handlePayment = async () => {
+    if (!user) {
+      Alert.alert(
+        "Connexion requise",
+        "Veuillez vous connecter pour accéder au contenu premium",
+        [
+          {
+            text: "Annuler",
+            style: "cancel"
+          },
+          { 
+            text: "Se connecter", 
+            onPress: () => router.push('/login')
+          }
+        ]
+      );
+      return;
+    }
+
     Alert.alert(
       "Accès Premium",
       "Voulez-vous payer 1000 FCFA pour accéder à toutes les cultures?",
@@ -51,16 +89,34 @@ export default function HomeScreen() {
         },
         { 
           text: "Payer", 
-          onPress: () => {
-            // Simulation de paiement réussi
-            Alert.alert("Succès", "Paiement effectué avec succès! Redirection...");
-            setTimeout(() => {
-              router.push('/cultures-premium');
-            }, 1500);
+          onPress: async () => {
+            try {
+              // Mettre à jour le statut premium dans Firestore
+              await updateDoc(doc(db, 'users', user.uid), {
+                isPremium: true,
+                premiumActivatedAt: new Date(),
+              });
+              setIsPremium(true);
+              Alert.alert("Succès", "Paiement effectué avec succès! Redirection...");
+              setTimeout(() => {
+                router.push('/cultures-premium');
+              }, 1500);
+            } catch (error) {
+              console.error("Erreur lors du paiement: ", error);
+              Alert.alert("Erreur", "Une erreur est survenue lors du paiement.");
+            }
           }
         }
       ]
     );
+  };
+
+  const handlePremiumAccess = () => {
+    if (isPremium) {
+      router.push('/cultures-premium');
+    } else {
+      handlePayment();
+    }
   };
 
   const renderItem = ({ item }: { item: { id: string; title: string; description: string; category: string; date: string } }) => {
@@ -92,6 +148,15 @@ export default function HomeScreen() {
     return colors[category] || '#34495E';
   };
 
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#8B0000" />
+        <Text style={styles.loadingText}>Chargement...</Text>
+      </View>
+    );
+  }
+
   return (
     <ImageBackground
       source={require('@/assets/images/a.jpg')}
@@ -114,6 +179,12 @@ export default function HomeScreen() {
                 <Text style={styles.statText}>98% aiment</Text>
               </View>
             </View>
+            {user && isPremium && (
+              <View style={styles.premiumBadgeHeader}>
+                <Ionicons name="star" size={16} color="#FFD700" />
+                <Text style={styles.premiumBadgeText}>Compte Premium</Text>
+              </View>
+            )}
           </View>
         </View>
 
@@ -132,49 +203,67 @@ export default function HomeScreen() {
         </View>
 
         {/* Section Paiement Premium */}
-        <View style={styles.premiumSection}>
-          <View style={styles.premiumCard}>
-            <View style={styles.premiumBadge}>
-              <Ionicons name="lock-closed" size={24} color="#FFD700" />
-            </View>
-            <Text style={styles.premiumTitle}>Contenu Premium</Text>
-            <Text style={styles.premiumDescription}>
-              Débloquez l'accès complet à toutes les cultures du Cameroun avec des détails exclusifs, photos et vidéos.
-            </Text>
-            
-            <View style={styles.pricingContainer}>
-              <Text style={styles.originalPrice}>2000 FCFA</Text>
-              <Text style={styles.discountedPrice}>1000 FCFA</Text>
-              <View style={styles.discountBadge}>
-                <Text style={styles.discountText}>-50%</Text>
+        {!isPremium ? (
+          <View style={styles.premiumSection}>
+            <View style={styles.premiumCard}>
+              <View style={styles.premiumBadge}>
+                <Ionicons name="lock-closed" size={24} color="#FFD700" />
               </View>
-            </View>
+              <Text style={styles.premiumTitle}>Contenu Premium</Text>
+              <Text style={styles.premiumDescription}>
+                Débloquez l'accès complet à toutes les cultures du Cameroun avec des détails exclusifs, photos et vidéos.
+              </Text>
+              
+              <View style={styles.pricingContainer}>
+                <Text style={styles.originalPrice}>2000 FCFA</Text>
+                <Text style={styles.discountedPrice}>1000 FCFA</Text>
+                <View style={styles.discountBadge}>
+                  <Text style={styles.discountText}>-50%</Text>
+                </View>
+              </View>
 
-            <TouchableOpacity style={styles.paymentButton} onPress={handlePayment}>
-              <Ionicons name="card" size={20} color="#FFF" />
-              <Text style={styles.paymentButtonText}>Payer 1000 FCFA</Text>
-            </TouchableOpacity>
+              <TouchableOpacity style={styles.paymentButton} onPress={handlePayment}>
+                <Ionicons name="card" size={20} color="#FFF" />
+                <Text style={styles.paymentButtonText}>Payer 1000 FCFA</Text>
+              </TouchableOpacity>
 
-            <View style={styles.featuresList}>
-              <View style={styles.featureItem}>
-                <Ionicons name="checkmark-circle" size={16} color="#27AE60" />
-                <Text style={styles.featureText}>4 grandes cultures détaillées</Text>
-              </View>
-              <View style={styles.featureItem}>
-                <Ionicons name="checkmark-circle" size={16} color="#27AE60" />
-                <Text style={styles.featureText}>Photos exclusives</Text>
-              </View>
-              <View style={styles.featureItem}>
-                <Ionicons name="checkmark-circle" size={16} color="#27AE60" />
-                <Text style={styles.featureText}>Vidéos traditionnelles</Text>
-              </View>
-              <View style={styles.featureItem}>
-                <Ionicons name="checkmark-circle" size={16} color="#27AE60" />
-                <Text style={styles.featureText}>Accès à vie</Text>
+              <View style={styles.featuresList}>
+                <View style={styles.featureItem}>
+                  <Ionicons name="checkmark-circle" size={16} color="#27AE60" />
+                  <Text style={styles.featureText}>4 grandes cultures détaillées</Text>
+                </View>
+                <View style={styles.featureItem}>
+                  <Ionicons name="checkmark-circle" size={16} color="#27AE60" />
+                  <Text style={styles.featureText}>Photos exclusives</Text>
+                </View>
+                <View style={styles.featureItem}>
+                  <Ionicons name="checkmark-circle" size={16} color="#27AE60" />
+                  <Text style={styles.featureText}>Vidéos traditionnelles</Text>
+                </View>
+                <View style={styles.featureItem}>
+                  <Ionicons name="checkmark-circle" size={16} color="#27AE60" />
+                  <Text style={styles.featureText}>Accès à vie</Text>
+                </View>
               </View>
             </View>
           </View>
-        </View>
+        ) : (
+          <View style={styles.premiumSection}>
+            <View style={styles.premiumCard}>
+              <View style={styles.premiumBadge}>
+                <Ionicons name="star" size={24} color="#FFD700" />
+              </View>
+              <Text style={styles.premiumTitle}>Vous êtes Premium !</Text>
+              <Text style={styles.premiumDescription}>
+                Profitez de l'accès complet à toutes les cultures du Cameroun.
+              </Text>
+              <TouchableOpacity style={styles.paymentButton} onPress={() => router.push('/cultures-premium')}>
+                <Ionicons name="arrow-forward" size={20} color="#FFF" />
+                <Text style={styles.paymentButtonText}>Accéder aux cultures</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
 
         {/* News List */}
         <View style={styles.newsSection}>
@@ -230,6 +319,17 @@ const styles = StyleSheet.create({
     flexGrow: 1, 
     padding: 20,
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#FFF8DC',
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#8B0000',
+  },
   header: {
     marginBottom: 30,
     alignItems: 'center',
@@ -239,7 +339,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 240, 0.95)',
     padding: 20,
     borderRadius: 20,
-    width: width - 40,
+    width: Dimensions.get('window').width - 40,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
@@ -274,6 +374,21 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#333',
     fontWeight: '500',
+  },
+  premiumBadgeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#8B0000',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 15,
+    marginTop: 10,
+  },
+  premiumBadgeText: {
+    color: '#FFD700',
+    fontWeight: '700',
+    fontSize: 12,
+    marginLeft: 5,
   },
   featuredSection: {
     marginBottom: 30,
@@ -524,7 +639,6 @@ const styles = StyleSheet.create({
     padding: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    width: (width - 70) / 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,

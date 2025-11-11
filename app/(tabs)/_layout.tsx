@@ -6,17 +6,19 @@ import { auth } from '../../firebase/kamerun';
 export default function RootLayout() {
   const router = useRouter();
 
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        router.replace('/(tabs)/home'); // utilisateur connecté
-      } else {
-        router.replace('/login'); // utilisateur non connecté
-      }
-    });
 
-    return unsubscribe;
-  }, []);
+useEffect(() => {
+  const unsubscribe = onAuthStateChanged(auth, (user) => {
+    if (user) {
+      router.replace('/AppDrawer'); // utilisateur connecté
+    } else {
+      router.replace('/login'); // utilisateur non connecté
+    }
+  });
+
+  return unsubscribe;
+}, []);
+
 
   return <Slot />;
 }

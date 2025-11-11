@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
@@ -17,10 +18,14 @@ import {
 } from 'react-native';
 import { auth, db } from '../../firebase/kamerun';
 
+
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+
   const [loading, setLoading] = useState(false);
+
   const router = useRouter(); // navigation
 
   const handleLogin = async () => {
@@ -47,7 +52,7 @@ export default function LoginScreen() {
       }
 
       Alert.alert('Succès', 'Connexion réussie !');
-      router.replace('/(tabs)/home'); // redirige vers la page d'accueil
+      router.replace('/(tabs)/AppDrawer'); // redirige vers la page d'accueil
     } catch (error: any) {
       Alert.alert('Erreur', error.message);
     } finally {
@@ -76,13 +81,25 @@ export default function LoginScreen() {
               style={styles.input}
               keyboardType="email-address"
             />
-            <TextInput
-              placeholder="Mot de passe"
-              value={password}
-              onChangeText={setPassword}
-              style={styles.input}
-              secureTextEntry
-            />
+        <View style={styles.passwordContainer}>
+  <TextInput
+    placeholder="Mot de passe"
+    value={password}
+    onChangeText={setPassword}
+    // style={[styles.input, { flex: 1 }]}
+  
+    secureTextEntry={!showPassword}
+  />
+  <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+    <Ionicons
+      name={showPassword ? 'eye' : 'eye-off'}
+      size={24}
+      color="#8B0000"
+      style={{ marginLeft: 150, padding: 5 }}
+    />
+  </TouchableOpacity>
+</View>
+
 
             <TouchableOpacity
               style={[styles.button, loading && { backgroundColor: '#aaa' }]}
@@ -161,4 +178,16 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#8B0000',
   },
+  passwordContainer: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  borderWidth: 1,
+  borderColor: '#8B0000',
+  borderRadius: 10,
+  paddingHorizontal: 10,
+  height: 50,
+  marginBottom: 15,
+  backgroundColor: '#FFF8DC',
+},
+
 });
