@@ -1,4 +1,4 @@
-import { Ionicons } from '@expo/vector-icons'; // 👈 Icônes Expo
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
@@ -30,7 +30,7 @@ export default function SignUpScreen() {
   const [phone, setPhone] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
 
-  // Visibilité des mots de passe 👁️
+  // Visibilité des mots de passe
   const [showPassword, setShowPassword] = useState<boolean>(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState<boolean>(false);
 
@@ -74,6 +74,7 @@ export default function SignUpScreen() {
         tribe: tribe.trim(),
         phone: phone.trim(),
         email: email.trim().toLowerCase(),
+        isPremium: false,
         createdAt: new Date(),
       });
 
@@ -81,7 +82,17 @@ export default function SignUpScreen() {
       router.push('/login');
     } catch (error: any) {
       console.error('Erreur création compte:', error);
-      Alert.alert('Erreur', error.message);
+      let errorMessage = "Une erreur s'est produite lors de la création du compte.";
+      
+      if (error.code === 'auth/email-already-in-use') {
+        errorMessage = "Cette adresse email est déjà utilisée.";
+      } else if (error.code === 'auth/weak-password') {
+        errorMessage = "Le mot de passe est trop faible.";
+      } else if (error.code === 'auth/invalid-email') {
+        errorMessage = "L'adresse email n'est pas valide.";
+      }
+      
+      Alert.alert('Erreur', errorMessage);
     } finally {
       setLoading(false);
     }
@@ -94,57 +105,99 @@ export default function SignUpScreen() {
       resizeMode="cover"
     >
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
       >
         <ScrollView contentContainerStyle={styles.scrollContainer}>
           <View style={styles.container}>
             <Text style={styles.title}>Inscription</Text>
+            <Text style={styles.subtitle}>Rejoignez la communauté Kamerun News</Text>
 
-            <TextInput placeholder="Nom" value={lastName} onChangeText={setLastName} style={styles.input} />
-            <TextInput placeholder="Prénom" value={firstName} onChangeText={setFirstName} style={styles.input} />
-            <TextInput placeholder="Ethnie / Tribu" value={tribe} onChangeText={setTribe} style={styles.input} />
-            <TextInput
-              placeholder="Numéro de téléphone (ex: 2376XXXXXXXX)"
-              value={phone}
-              onChangeText={setPhone}
-              style={styles.input}
-              keyboardType="phone-pad"
-            />
-            <TextInput
-              placeholder="Adresse e-mail"
-              value={email}
-              onChangeText={setEmail}
-              style={styles.input}
-              keyboardType="email-address"
-            />
-
-            {/* Champ mot de passe avec icône 👁️ */}
-            <View style={styles.passwordContainer}>
-              <TextInput
-                placeholder="Mot de passe"
-                value={password}
-                onChangeText={setPassword}
-                style={[styles.input, { flex: 1, marginBottom: 0 }]}
-                secureTextEntry={!showPassword}
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Nom</Text>
+              <TextInput 
+                placeholder="Votre nom" 
+                value={lastName} 
+                onChangeText={setLastName} 
+                style={styles.input} 
               />
-              <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeIcon}>
-                <Ionicons name={showPassword ? 'eye-off' : 'eye'} size={22} color="#8B0000" />
-              </TouchableOpacity>
             </View>
 
-            {/* Champ confirmation mot de passe avec icône 👁️ */}
-            <View style={styles.passwordContainer}>
-              <TextInput
-                placeholder="Confirmer le mot de passe"
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-                style={[styles.input, { flex: 1, marginBottom: 0 }]}
-                secureTextEntry={!showConfirmPassword}
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Prénom</Text>
+              <TextInput 
+                placeholder="Votre prénom" 
+                value={firstName} 
+                onChangeText={setFirstName} 
+                style={styles.input} 
               />
-              <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)} style={styles.eyeIcon}>
-                <Ionicons name={showConfirmPassword ? 'eye-off' : 'eye'} size={22} color="#8B0000" />
-              </TouchableOpacity>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Ethnie / Tribu</Text>
+              <TextInput 
+                placeholder="Votre ethnie ou tribu" 
+                value={tribe} 
+                onChangeText={setTribe} 
+                style={styles.input} 
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Numéro de téléphone</Text>
+              <TextInput
+                placeholder="2376XXXXXXXX"
+                value={phone}
+                onChangeText={setPhone}
+                style={styles.input}
+                keyboardType="phone-pad"
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Adresse e-mail</Text>
+              <TextInput
+                placeholder="votre@email.com"
+                value={email}
+                onChangeText={setEmail}
+                style={styles.input}
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
+            </View>
+
+            {/* Champ mot de passe avec icône */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Mot de passe</Text>
+              <View style={styles.passwordContainer}>
+                <TextInput
+                  placeholder="Minimum 6 caractères"
+                  value={password}
+                  onChangeText={setPassword}
+                  style={[styles.input, { flex: 1, marginBottom: 0, borderWidth: 0 }]}
+                  secureTextEntry={!showPassword}
+                />
+                <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeIcon}>
+                  <Ionicons name={showPassword ? 'eye-off' : 'eye'} size={22} color="#8B0000" />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Champ confirmation mot de passe avec icône */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Confirmer le mot de passe</Text>
+              <View style={styles.passwordContainer}>
+                <TextInput
+                  placeholder="Confirmez votre mot de passe"
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  style={[styles.input, { flex: 1, marginBottom: 0, borderWidth: 0 }]}
+                  secureTextEntry={!showConfirmPassword}
+                />
+                <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)} style={styles.eyeIcon}>
+                  <Ionicons name={showConfirmPassword ? 'eye-off' : 'eye'} size={22} color="#8B0000" />
+                </TouchableOpacity>
+              </View>
             </View>
 
             <TouchableOpacity
@@ -152,7 +205,14 @@ export default function SignUpScreen() {
               onPress={handleSignUp}
               disabled={loading}
             >
-              {loading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.buttonText}>S'inscrire</Text>}
+              {loading ? (
+                <ActivityIndicator color="#FFF" />
+              ) : (
+                <>
+                  <Ionicons name="person-add" size={20} color="#FFF" />
+                  <Text style={styles.buttonText}>Créer mon compte</Text>
+                </>
+              )}
             </TouchableOpacity>
 
             <Text style={styles.link}>
@@ -170,61 +230,87 @@ export default function SignUpScreen() {
 
 const styles = StyleSheet.create({
   background: { flex: 1 },
-  scrollContainer: { flexGrow: 1 },
+  scrollContainer: { flexGrow: 1, justifyContent: 'center' },
   container: {
-    flex: 1,
-    backgroundColor: 'rgba(255, 255, 240, 0.85)',
+    backgroundColor: 'rgba(255, 255, 240, 0.95)',
     margin: 20,
-    borderRadius: 15,
-    padding: 20,
-    justifyContent: 'center',
+    borderRadius: 20,
+    padding: 25,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   },
   title: {
-    fontSize: 28,
-    fontWeight: '700',
-    marginBottom: 25,
+    fontSize: 32,
+    fontWeight: '800',
+    marginBottom: 8,
     color: '#8B0000',
     textAlign: 'center',
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#4B0082',
+    textAlign: 'center',
+    marginBottom: 30,
+    fontWeight: '500',
+  },
+  inputGroup: {
+    marginBottom: 20,
+  },
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#8B0000',
+    marginBottom: 8,
+    marginLeft: 5,
   },
   input: {
     borderWidth: 1,
     borderColor: '#8B0000',
-    borderRadius: 10,
+    borderRadius: 12,
     paddingHorizontal: 15,
     height: 50,
-    marginBottom: 15,
     backgroundColor: '#FFF8DC',
+    fontSize: 16,
   },
   passwordContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#8B0000',
-    borderRadius: 10,
+    borderRadius: 12,
     backgroundColor: '#FFF8DC',
     height: 50,
-    marginBottom: 15,
-    paddingRight: 10,
   },
   eyeIcon: {
-    padding: 5,
+    padding: 10,
   },
   button: {
-    backgroundColor: '#FF8C00',
-    paddingVertical: 15,
-    borderRadius: 10,
+    backgroundColor: '#8B0000',
+    paddingVertical: 16,
+    borderRadius: 12,
     alignItems: 'center',
-    marginTop: 5,
+    marginTop: 10,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
   },
   buttonText: {
     color: '#FFF',
-    fontWeight: '600',
-    fontSize: 16,
+    fontWeight: '700',
+    fontSize: 18,
+    marginLeft: 10,
   },
   link: {
-    marginTop: 15,
+    marginTop: 20,
     textAlign: 'center',
-    fontSize: 14,
+    fontSize: 15,
     color: '#4B0082',
   },
   linkHighlight: {

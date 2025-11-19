@@ -1,10 +1,128 @@
 // @ts-ignore
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { FlatList, ImageBackground, ScrollView, StyleSheet, Text, TouchableOpacity, View, Dimensions, Alert, ActivityIndicator } from 'react-native';
+import { 
+  FlatList, 
+  ImageBackground, 
+  ScrollView, 
+  StyleSheet, 
+  Text, 
+  TouchableOpacity, 
+  View, 
+  Dimensions, 
+  Alert, 
+  ActivityIndicator,
+  Modal,
+  TextInput,
+  Linking 
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { auth, db } from '../../firebase/kamerun';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
+
+// Configuration du backend
+const BACKEND_URL = 'https://severbackendnotchpay.onrender.com'; // Remplacez par votre URL de production
+
+// Méthodes de paiement supportées
+const PAYMENT_METHODS = [
+  { id: 'mtn', name: 'MTN Mobile Money', icon: '📱' },
+  { id: 'orange', name: 'Orange Money', icon: '🍊' },
+];
+
+// Service pour interagir avec le backend
+class PaymentService {
+  static async checkBackendHealth(): Promise<boolean> {
+    try {
+      const response = await fetch(`${BACKEND_URL}/`);
+      return response.ok;
+    } catch (error) {
+      console.error('Erreur vérification backend:', error);
+      return false;
+    }
+  }
+
+  static async initiatePayment(
+    amount: number,
+    phone: string,
+    method: string,
+    userId: string,
+    email?: string,
+    name?: string
+  ) {
+    try {
+      const response = await fetch(`${BACKEND_URL}/payments/initiate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: email || 'user@example.com',
+          amount: amount,
+          name: name || 'Utilisateur',
+          phone: phone,
+          description: 'Abonnement Premium Kamerun News'
+        }),
+      });
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Erreur initiation paiement:', error);
+      throw error;
+    }
+  }
+
+  static async verifyPayment(reference: string) {
+    try {
+      const response = await fetch(`${BACKEND_URL}/payments/verify/${reference}`);
+      const data = await response.json();
+      
+      return {
+        paid: data.status === 'complete',
+        status: data.status,
+        transaction: data.transaction
+      };
+    } catch (error) {
+      console.error('Erreur vérification paiement:', error);
+      throw error;
+    }
+  }
+
+  static async getUserPremiumStatus(userId: string) {
+    try {
+      const userDoc = await getDoc(doc(db, 'users', userId));
+      if (userDoc.exists()) {
+        const data = userDoc.data();
+        return { isPremium: data.isPremium || false };
+      }
+      return { isPremium: false };
+    } catch (error) {
+      console.error('Erreur statut premium:', error);
+      return { isPremium: false };
+    }
+  }
+}
+
+// Validation du numéro de téléphone
+const validatePhoneNumber = (phone: string, method: string) => {
+  const cleaned = phone.replace(/\D/g, '');
+
+  if (cleaned.length < 9) {
+    return { isValid: false, message: 'Le numéro doit avoir au moins 9 chiffres' };
+  }
+
+  if (method === 'mtn') {
+    if (!cleaned.startsWith('6')) {
+      return { isValid: false, message: 'Le numéro MTN doit commencer par 6' };
+    }
+  } else if (method === 'orange') {
+    if (!cleaned.startsWith('6') && !cleaned.startsWith('7')) {
+      return { isValid: false, message: 'Le numéro Orange doit commencer par 6 ou 7' };
+    }
+  }
+
+  return { isValid: true, message: '' };
+};
 
 const newsData = [
   {
@@ -40,27 +158,47 @@ const newsData = [
 export default function HomeScreen() {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
+  const [userData, setUserData] = useState<any>(null);
   const [isPremium, setIsPremium] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
+  const [processingPayment, setProcessingPayment] = useState<boolean>(false);
+  const [showPaymentModal, setShowPaymentModal] = useState<boolean>(false);
+  const [selectedMethod, setSelectedMethod] = useState<string>('');
+  const [phoneNumber, setPhoneNumber] = useState<string>('');
+  const [currentTransaction, setCurrentTransaction] = useState<string>('');
+  const [backendAvailable, setBackendAvailable] = useState<boolean>(true);
+
+  // Vérifier la disponibilité du backend au chargement
+  useEffect(() => {
+    const checkBackend = async () => {
+      const isAvailable = await PaymentService.checkBackendHealth();
+      setBackendAvailable(isAvailable);
+    };
+    
+    checkBackend();
+  }, []);
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (user) => {
       setUser(user);
       if (user) {
-        // Vérifier le statut premium
         const userDoc = await getDoc(doc(db, 'users', user.uid));
         if (userDoc.exists()) {
-          setIsPremium(userDoc.data().isPremium || false);
+          const data = userDoc.data();
+          setUserData(data);
+          setIsPremium(data.isPremium || false);
+          setPhoneNumber(data.phone || '');
         }
       } else {
         setIsPremium(false);
+        setUserData(null);
       }
       setLoading(false);
     });
     return unsubscribe;
   }, []);
 
-  const handlePayment = async () => {
+  const handleBackendPayment = () => {
     if (!user) {
       Alert.alert(
         "Connexion requise",
@@ -79,44 +217,169 @@ export default function HomeScreen() {
       return;
     }
 
-    Alert.alert(
-      "Accès Premium",
-      "Voulez-vous payer 1000 FCFA pour accéder à toutes les cultures?",
-      [
-        {
-          text: "Annuler",
-          style: "cancel"
-        },
-        { 
-          text: "Payer", 
-          onPress: async () => {
-            try {
-              // Mettre à jour le statut premium dans Firestore
-              await updateDoc(doc(db, 'users', user.uid), {
-                isPremium: true,
-                premiumActivatedAt: new Date(),
-              });
-              setIsPremium(true);
-              Alert.alert("Succès", "Paiement effectué avec succès! Redirection...");
-              setTimeout(() => {
-                router.push('/cultures-premium');
-              }, 1500);
-            } catch (error) {
-              console.error("Erreur lors du paiement: ", error);
-              Alert.alert("Erreur", "Une erreur est survenue lors du paiement.");
-            }
-          }
-        }
-      ]
-    );
+    if (!backendAvailable) {
+      Alert.alert(
+        "Service indisponible",
+        "Le service de paiement est temporairement indisponible. Veuillez réessayer plus tard.",
+        [{ text: "OK" }]
+      );
+      return;
+    }
+
+    setShowPaymentModal(true);
   };
 
-  const handlePremiumAccess = () => {
-    if (isPremium) {
-      router.push('/cultures-premium');
-    } else {
-      handlePayment();
+  const processBackendPayment = async (method: string) => {
+    if (!backendAvailable) {
+      Alert.alert('Service indisponible', 'Le service de paiement est temporairement indisponible.');
+      return;
     }
+
+    if (!phoneNumber) {
+      Alert.alert('Erreur', 'Veuillez entrer votre numéro de téléphone');
+      return;
+    }
+
+    const validation = validatePhoneNumber(phoneNumber, method);
+    if (!validation.isValid) {
+      Alert.alert('Numéro invalide', validation.message);
+      return;
+    }
+
+    setProcessingPayment(true);
+    setSelectedMethod(method);
+
+    try {
+      const paymentResult = await PaymentService.initiatePayment(
+        1000, // 1000 FCFA
+        phoneNumber,
+        method,
+        user.uid,
+        userData?.email,
+        `${userData?.firstName} ${userData?.lastName}`
+      );
+
+      if (paymentResult.success && paymentResult.data?.transaction?.reference) {
+        const transactionId = paymentResult.data.transaction.reference;
+        setCurrentTransaction(transactionId);
+        
+        if (paymentResult.paymentUrl) {
+          Alert.alert(
+            'Redirection',
+            'Vous allez être redirigé pour compléter le paiement',
+            [
+              {
+                text: 'Annuler',
+                style: 'cancel',
+                onPress: () => {
+                  setProcessingPayment(false);
+                  setCurrentTransaction('');
+                }
+              },
+              {
+                text: 'Continuer',
+                onPress: async () => {
+                  const canOpen = await Linking.canOpenURL(paymentResult.paymentUrl);
+                  if (canOpen) {
+                    Linking.openURL(paymentResult.paymentUrl)
+                      .catch(err => {
+                        console.error('Erreur ouverture URL:', err);
+                        Alert.alert('Erreur', 'Impossible d\'ouvrir la page de paiement');
+                      });
+                    setShowPaymentModal(false);
+                    startBackendPaymentStatusCheck(transactionId);
+                  } else {
+                    Alert.alert('Erreur', 'Impossible d\'ouvrir le lien de paiement');
+                  }
+                }
+              }
+            ]
+          );
+        } else {
+          Alert.alert(
+            'Paiement initié',
+            'Veuillez confirmer le paiement sur votre téléphone',
+            [
+              {
+                text: 'OK',
+                onPress: () => {
+                  setShowPaymentModal(false);
+                  startBackendPaymentStatusCheck(transactionId);
+                }
+              }
+            ]
+          );
+        }
+      } else {
+        Alert.alert(
+          'Erreur de Paiement', 
+          paymentResult.message || 'Erreur lors de l\'initiation du paiement',
+          [{ text: 'OK' }]
+        );
+      }
+    } catch (error) {
+      console.error('Erreur paiement backend:', error);
+      Alert.alert('Erreur', 'Une erreur est survenue lors du paiement');
+    } finally {
+      setProcessingPayment(false);
+    }
+  };
+
+  const startBackendPaymentStatusCheck = async (transactionId: string) => {
+    let attempts = 0;
+    const maxAttempts = 60; // 60 tentatives sur 5 minutes
+    
+    const checkStatus = async () => {
+      attempts++;
+      const status = await PaymentService.verifyPayment(transactionId);
+      
+      if (status.paid) {
+        // Paiement réussi - mettre à jour le statut premium dans Firebase
+        try {
+          if (user) {
+            await updateDoc(doc(db, 'users', user.uid), {
+              isPremium: true,
+              premiumActivatedAt: new Date(),
+              lastPaymentDate: new Date()
+            });
+            
+            Alert.alert('Succès', 'Paiement confirmé! Accès premium activé.');
+            setIsPremium(true);
+            setCurrentTransaction('');
+            router.push('/cultures-premium');
+          }
+        } catch (error) {
+          console.error('Erreur mise à jour statut premium:', error);
+          Alert.alert('Succès', 'Paiement confirmé! Redirection...');
+          setIsPremium(true);
+          setCurrentTransaction('');
+          router.push('/cultures-premium');
+        }
+        return;
+      }
+      
+      if (status.status === 'failed' || status.status === 'canceled') {
+        Alert.alert('Échec', 'Le paiement a échoué ou a été annulé.');
+        setCurrentTransaction('');
+        return;
+      }
+      
+      if (attempts < maxAttempts) {
+        // Continuer à vérifier toutes les 5 secondes
+        setTimeout(checkStatus, 5000);
+      } else {
+        Alert.alert(
+          'Délai dépassé',
+          'Le paiement n\'a pas été confirmé dans le délai imparti. Vous serez notifié lorsque le paiement sera traité.',
+          [{ 
+            text: 'OK',
+            onPress: () => setCurrentTransaction('')
+          }]
+        );
+      }
+    };
+    
+    checkStatus();
   };
 
   const renderItem = ({ item }: { item: { id: string; title: string; description: string; category: string; date: string } }) => {
@@ -147,6 +410,88 @@ export default function HomeScreen() {
     };
     return colors[category] || '#34495E';
   };
+
+  const renderPaymentModal = () => (
+    <Modal
+      visible={showPaymentModal}
+      animationType="slide"
+      transparent={true}
+      onRequestClose={() => setShowPaymentModal(false)}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContent}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Paiement Premium</Text>
+            <TouchableOpacity 
+              onPress={() => setShowPaymentModal(false)}
+              style={styles.closeButton}
+            >
+              <Ionicons name="close" size={24} color="#8B0000" />
+            </TouchableOpacity>
+          </View>
+
+          <Text style={styles.modalDescription}>
+            Choisissez votre méthode de paiement et entrez votre numéro de téléphone
+          </Text>
+
+          <View style={styles.phoneInputContainer}>
+            <Text style={styles.inputLabel}>Numéro de téléphone</Text>
+            <TextInput
+              style={styles.phoneInput}
+              placeholder="6XX XXX XXX"
+              value={phoneNumber}
+              onChangeText={setPhoneNumber}
+              keyboardType="phone-pad"
+              autoFocus={true}
+            />
+            <Text style={styles.phoneHint}>
+              Entrez votre numéro MTN ou Orange
+            </Text>
+          </View>
+
+          <View style={styles.paymentMethods}>
+            {PAYMENT_METHODS.map((method) => (
+              <TouchableOpacity
+                key={method.id}
+                style={[
+                  styles.paymentMethodButton,
+                  processingPayment && { opacity: 0.6 }
+                ]}
+                onPress={() => processBackendPayment(method.id)}
+                disabled={processingPayment}
+              >
+                <Text style={styles.paymentMethodIcon}>{method.icon}</Text>
+                <View style={styles.paymentMethodInfo}>
+                  <Text style={styles.paymentMethodName}>{method.name}</Text>
+                  <Text style={styles.paymentMethodAmount}>1000 FCFA</Text>
+                </View>
+                {processingPayment && selectedMethod === method.id && (
+                  <ActivityIndicator size="small" color="#8B0000" />
+                )}
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <View style={styles.securityNotice}>
+            <Ionicons name="shield-checkmark" size={16} color="#27AE60" />
+            <Text style={styles.securityText}>
+              Paiement sécurisé par NotchPay
+            </Text>
+          </View>
+
+          <View style={styles.paymentInstructions}>
+            <Text style={styles.instructionsTitle}>Instructions:</Text>
+            <Text style={styles.instructionsText}>
+              1. Choisissez votre opérateur{'\n'}
+              2. Entrez votre numéro{'\n'}
+              3. Confirmez le paiement sur votre mobile{'\n'}
+              4. Attendez la confirmation automatique
+            </Text>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
 
   if (loading) {
     return (
@@ -222,15 +567,55 @@ export default function HomeScreen() {
                 </View>
               </View>
 
-              <TouchableOpacity style={styles.paymentButton} onPress={handlePayment}>
-                <Ionicons name="card" size={20} color="#FFF" />
-                <Text style={styles.paymentButtonText}>Payer 1000 FCFA</Text>
+              <TouchableOpacity 
+                style={[
+                  styles.paymentButton, 
+                  (!backendAvailable || processingPayment) && { backgroundColor: '#aaa' }
+                ]} 
+                onPress={handleBackendPayment}
+                disabled={!backendAvailable || processingPayment}
+              >
+                {processingPayment ? (
+                  <ActivityIndicator color="#FFF" />
+                ) : !backendAvailable ? (
+                  <>
+                    <Ionicons name="warning" size={20} color="#FFF" />
+                    <Text style={styles.paymentButtonText}>Service indisponible</Text>
+                  </>
+                ) : (
+                  <>
+                    <Ionicons name="card" size={20} color="#FFF" />
+                    <Text style={styles.paymentButtonText}>Payer 1000 FCFA</Text>
+                  </>
+                )}
               </TouchableOpacity>
+
+              {!backendAvailable && (
+                <View style={styles.warningBox}>
+                  <Ionicons name="information-circle" size={16} color="#E67E22" />
+                  <Text style={styles.warningText}>
+                    Le service de paiement est temporairement indisponible
+                  </Text>
+                </View>
+              )}
+
+              <View style={styles.paymentMethodsPreview}>
+                <Text style={styles.paymentMethodsTitle}>Paiements sécurisés:</Text>
+                <View style={styles.paymentMethodsIcons}>
+                  <Text style={styles.paymentMethodPreview}>📱 MTN Money</Text>
+                  <Text style={styles.paymentMethodPreview}>🍊 Orange Money</Text>
+                </View>
+              </View>
+
+              <View style={styles.securityBadge}>
+                <Ionicons name="shield-checkmark" size={14} color="#27AE60" />
+                <Text style={styles.securityTextSmall}>Sécurisé par NotchPay</Text>
+              </View>
 
               <View style={styles.featuresList}>
                 <View style={styles.featureItem}>
                   <Ionicons name="checkmark-circle" size={16} color="#27AE60" />
-                  <Text style={styles.featureText}>4 grandes cultures détaillées</Text>
+                  <Text style={styles.featureText}>6 cultures détaillées</Text>
                 </View>
                 <View style={styles.featureItem}>
                   <Ionicons name="checkmark-circle" size={16} color="#27AE60" />
@@ -307,6 +692,8 @@ export default function HomeScreen() {
           </View>
         </View>
       </ScrollView>
+
+      {renderPaymentModal()}
     </ImageBackground>
   );
 }
@@ -530,6 +917,23 @@ const styles = StyleSheet.create({
     color: '#FFF',
     marginLeft: 10,
   },
+  warningBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(230, 126, 34, 0.1)',
+    padding: 12,
+    borderRadius: 10,
+    marginBottom: 15,
+    borderWidth: 1,
+    borderColor: 'rgba(230, 126, 34, 0.3)',
+  },
+  warningText: {
+    fontSize: 12,
+    color: '#E67E22',
+    fontWeight: '500',
+    marginLeft: 8,
+    flex: 1,
+  },
   featuresList: {
     width: '100%',
   },
@@ -651,5 +1055,155 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#8B0000',
     textAlign: 'center',
+  },
+  // Styles pour le modal de paiement
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: '#FFF8DC',
+    borderRadius: 20,
+    padding: 25,
+    width: Dimensions.get('window').width - 40,
+    maxHeight: Dimensions.get('window').height - 100,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#8B0000',
+  },
+  closeButton: {
+    padding: 5,
+  },
+  modalDescription: {
+    fontSize: 14,
+    color: '#333',
+    marginBottom: 20,
+    lineHeight: 20,
+  },
+  phoneInputContainer: {
+    marginBottom: 20,
+  },
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#8B0000',
+    marginBottom: 8,
+  },
+  phoneInput: {
+    borderWidth: 1,
+    borderColor: '#8B0000',
+    borderRadius: 10,
+    paddingHorizontal: 15,
+    height: 50,
+    backgroundColor: '#FFF',
+    fontSize: 16,
+  },
+  phoneHint: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 5,
+    fontStyle: 'italic',
+  },
+  paymentMethods: {
+    marginBottom: 20,
+  },
+  paymentMethodButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF',
+    borderRadius: 12,
+    padding: 15,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  paymentMethodIcon: {
+    fontSize: 24,
+    marginRight: 15,
+  },
+  paymentMethodInfo: {
+    flex: 1,
+  },
+  paymentMethodName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+  },
+  paymentMethodAmount: {
+    fontSize: 14,
+    color: '#8B0000',
+    fontWeight: '700',
+  },
+  securityNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 15,
+    padding: 10,
+    backgroundColor: 'rgba(39, 174, 96, 0.1)',
+    borderRadius: 8,
+  },
+  securityText: {
+    fontSize: 12,
+    color: '#27AE60',
+    fontWeight: '600',
+    marginLeft: 5,
+  },
+  paymentInstructions: {
+    marginTop: 15,
+    padding: 15,
+    backgroundColor: 'rgba(139, 0, 0, 0.05)',
+    borderRadius: 10,
+  },
+  instructionsTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#8B0000',
+    marginBottom: 8,
+  },
+  instructionsText: {
+    fontSize: 12,
+    color: '#333',
+    lineHeight: 18,
+  },
+  paymentMethodsPreview: {
+    marginBottom: 15,
+    alignItems: 'center',
+  },
+  paymentMethodsTitle: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 8,
+  },
+  paymentMethodsIcons: {
+    flexDirection: 'row',
+    gap: 15,
+  },
+  paymentMethodPreview: {
+    fontSize: 12,
+    color: '#8B0000',
+    fontWeight: '500',
+  },
+  securityBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 10,
+  },
+  securityTextSmall: {
+    fontSize: 10,
+    color: '#27AE60',
+    fontWeight: '500',
+    marginLeft: 3,
   },
 });
