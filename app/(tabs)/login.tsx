@@ -26,52 +26,57 @@ export default function LoginScreen() {
 
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert('Erreur', 'Veuillez remplir tous les champs.');
+      Alert.alert("Erreur", "Veuillez remplir tous les champs.");
       return;
     }
-
+  
     setLoading(true);
+  
     try {
-      // Connexion avec Supabase
-      const { data, error } = await supabase.auth.signInWithPassword({
+      // 1) Login
+      const { data: auth, error: authError } = await supabase.auth.signInWithPassword({
         email: email.trim().toLowerCase(),
-        password: password,
+        password,
       });
-
-      if (error) {
-        throw error;
+  
+      if (authError) throw authError;
+  
+      const user = auth.user;
+      if (!user) {
+        throw new Error("Utilisateur introuvable après connexion.");
       }
-
-      if (data.user) {
-        // Récupération des infos utilisateur depuis la table profiles
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', data.user.id)
-          .single();
-
-        if (profileError) {
-          console.log('Erreur profil:', profileError);
-        } else {
-          console.log('Infos utilisateur:', profile);
-        }
-
-        Alert.alert('Succès', 'Connexion réussie !');
-        router.replace('/(tabs)/AppDrawer');
-      }
-    } catch (error: any) {
-      console.error('Erreur connexion:', error);
-      let errorMessage = 'Une erreur est survenue';
-      
-      if (error.message.includes('Invalid login credentials')) {
-        errorMessage = 'Email ou mot de passe incorrect';
-      }
-      
-      Alert.alert('Erreur', errorMessage);
+  
+      // 2) Charger le profil
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", user.id)
+        .single();
+  
+      if (profileError) throw profileError;
+  
+      console.log("Profil utilisateur:", profile);
+  
+      // 3) Redirection
+      router.replace("/(tabs)/AppDrawer");
+  
+    } catch (err: any) {
+      console.error("Erreur login:", err);
+  
+      const errorMap: Record<string, string> = {
+        "Invalid login credentials": "Email ou mot de passe incorrect.",
+        "Email not confirmed": "Veuillez vérifier votre email avant de vous connecter.",
+      };
+  
+      const message =
+        errorMap[err.message] ?? "Une erreur est survenue. Réessayez.";
+  
+      Alert.alert("Erreur", message);
     } finally {
       setLoading(false);
     }
   };
+  
 
   return (
     <ImageBackground

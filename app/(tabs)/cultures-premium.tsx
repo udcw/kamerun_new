@@ -1,7 +1,13 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, ImageBackground, TouchableOpacity, Dimensions } from 'react-native';
-import { useRouter } from 'expo-router';
+import ListItem from '@/components/molecules/ListItem';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import React from 'react';
+import { Dimensions, ImageBackground, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+
+import { supabase } from "@/lib/supabase";
+import { useEffect, useState } from "react";
+import { ActivityIndicator } from "react-native";
+
 
 const { width } = Dimensions.get('window');
 
@@ -40,8 +46,101 @@ const culturesData = [
   },
 ];
 
+const villages = [
+  {
+    id: "1",
+    name: "Bafoussam",
+    desc: "Capitale de la région de l’Ouest.",
+    image: "https://picsum.photos/200",
+  },
+  {
+    id: "c59fb0a9-098c-419e-bd04-780babe2bd7a",
+    name: "Bangangte",
+    desc: "Village traditionnel du peuple Bamiléké.",
+    image: "https://picsum.photos/201",
+  },
+  {
+    id: "10",
+    name: "Fufulde",
+    desc: "Capitale de la région de l’Ouest.",
+    image: "https://picsum.photos/200",
+  },
+  {
+    id: "3",
+    name: "Bafia",
+    desc: "Village traditionnel du peuple Bamiléké.",
+    image: "https://picsum.photos/201",
+  },
+  {
+    id: "4",
+    name: "Ewondo",
+    desc: "Capitale de la région de l’Ouest.",
+    image: "https://picsum.photos/200",
+  },
+  {
+    id: "5",
+    name: "Bassa",
+    desc: "Village traditionnel du peuple Bamiléké.",
+    image: "https://picsum.photos/201",
+  },
+  {
+    id: "6",
+    name: "Douala",
+    desc: "Capitale de la région de l’Ouest.",
+    image: "https://picsum.photos/200",
+  },
+  {
+    id: "c59fb0a9-098c-419e-bd04-780babe2bd7a",
+    name: "Eton",
+    desc: "Village traditionnel du peuple Bamiléké.",
+    image: "https://picsum.photos/201",
+  },
+  {
+    id: "db8b0445-98c6-4a8c-a0f0-d939b761b5a7",
+    name: "Bandjoun",
+    desc: "Capitale de la région de l’Ouest.",
+    image: "https://picsum.photos/200",
+  },
+  {
+    id: "e074e125-cae8-44d0-9f66-cf7ee8b22380",
+    name: "Bulu",
+    desc: "Village traditionnel du peuple Bamiléké.",
+    image: "https://picsum.photos/201",
+  },
+  {
+    id: "9f9e8eb37-6f6b-4a59-8c66-84747338420a",
+    name: "Bafang",
+    desc: "Village traditionnel du peuple Bamiléké.",
+    image: "https://picsum.photos/201",
+  },
+];
+
 export default function CulturesPremiumScreen() {
   const router = useRouter();
+
+  const [villagesData, setVillagesData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchVillages = async () => {
+      setLoading(true);
+
+      const { data, error } = await supabase
+        .from("villages")
+        .select("*")
+        .order("name", { ascending: true });
+
+      if (error) {
+        console.log("❌ Erreur villages:", error);
+      } else {
+        setVillagesData(data);
+      }
+
+      setLoading(false);
+    };
+
+    fetchVillages();
+  }, []);
 
   return (
     <ImageBackground
@@ -73,27 +172,60 @@ export default function CulturesPremiumScreen() {
         </View>
 
         {/* Cultures Grid */}
-        <View style={styles.culturesSection}>
-          <Text style={styles.sectionTitle}>Grandes Cultures du Cameroun</Text>
-          <View style={styles.culturesGrid}>
-            {culturesData.map((culture) => (
-              <TouchableOpacity
-                key={culture.id}
-                style={[styles.cultureCard, { backgroundColor: culture.color }]}
-                onPress={() => router.push(culture.route as any)}
-              >
-                <View style={styles.cultureIcon}>
-                  <Ionicons name={culture.icon as any} size={32} color="#FFF" />
-                </View>
-                <Text style={styles.cultureName}>{culture.name}</Text>
-                <Text style={styles.cultureDescription}>{culture.description}</Text>
-                <View style={styles.cultureArrow}>
-                  <Ionicons name="arrow-forward" size={20} color="#FFF" />
-                </View>
-              </TouchableOpacity>
-            ))}
+        {/* 
+          <View style={styles.culturesSection}>
+            <Text style={styles.sectionTitle}>Grandes Cultures du Cameroun</Text>
+            <View style={styles.culturesGrid}>
+              {culturesData.map((culture) => (
+                <TouchableOpacity
+                  key={culture.id}
+                  style={[styles.cultureCard, { backgroundColor: culture.color }]}
+                  onPress={() => router.push(culture.route as any)}
+                >
+                  <View style={styles.cultureIcon}>
+                    <Ionicons name={culture.icon as any} size={32} color="#FFF" />
+                  </View>
+                  <Text style={styles.cultureName}>{culture.name}</Text>
+                  <Text style={styles.cultureDescription}>{culture.description}</Text>
+                  <View style={styles.cultureArrow}>
+                    <Ionicons name="arrow-forward" size={20} color="#FFF" />
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
-        </View>
+         */}
+
+         {/* Test des listes des tribues */}
+         <View style={{ padding: 16 }}>
+  {loading && (
+    <ActivityIndicator size="large" color="#8B0000" style={{ marginTop: 30 }} />
+  )}
+
+  {!loading && villagesData.length === 0 && (
+    <Text style={{ textAlign: "center", color: "#FFF", marginTop: 20 }}>
+      Aucun village trouvé.
+    </Text>
+  )}
+
+  {!loading &&
+    villagesData.map((item) => (
+      <ListItem
+        key={item.id}
+        title={item.name}
+        subtitle={item.region}
+        image={item.image_url || "https://picsum.photos/200"}
+        onPress={() =>
+          router.push({
+            pathname: "/village-options",
+            params: { village: JSON.stringify(item) }
+          })
+        }
+      />
+    ))}
+</View>
+
+        
 
         {/* Additional Premium Features */}
         <View style={styles.featuresSection}>
@@ -121,6 +253,7 @@ export default function CulturesPremiumScreen() {
             </View>
           </View>
         </View>
+
       </ScrollView>
     </ImageBackground>
   );
