@@ -1,9 +1,7 @@
 import { createDrawerNavigator, DrawerContentScrollView, DrawerItem, DrawerItemList } from '@react-navigation/drawer';
-import { signOut } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
 import { Alert, Text, View } from 'react-native';
-import { auth, db } from '../../firebase/kamerun';
+import { supabase } from '../../lib/supabase';
 import ProfileScreen from './explore';
 import HomeScreen from './home';
 import SettingsScreen from './ProfileScreen';
@@ -15,12 +13,16 @@ export default function AppDrawer({ navigation }: any) {
 
   useEffect(() => {
     const fetchUserName = async () => {
-      if (auth.currentUser) {
-        const docRef = doc(db, 'users', auth.currentUser.uid);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          setUserName(data.firstName);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('first_name')
+          .eq('id', user.id)
+          .single();
+        
+        if (!error && profile) {
+          setUserName(profile.first_name);
         }
       }
     };
@@ -29,8 +31,12 @@ export default function AppDrawer({ navigation }: any) {
 
   const handleLogout = async () => {
     try {
-      await signOut(auth);
-      navigation.replace('login'); // redirige vers login après déconnexion
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        Alert.alert('Erreur', error.message);
+      } else {
+        navigation.replace('login');
+      }
     } catch (error: any) {
       Alert.alert('Erreur', error.message);
     }

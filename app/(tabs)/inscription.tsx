@@ -1,7 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
@@ -16,7 +14,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { auth, db } from '../../firebase/kamerun';
+import { supabase } from '../../lib/supabase';
 
 export default function SignUpScreen() {
   const router = useRouter();
@@ -30,7 +28,6 @@ export default function SignUpScreen() {
   const [phone, setPhone] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
 
-  // Visibilité des mots de passe
   const [showPassword, setShowPassword] = useState<boolean>(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState<boolean>(false);
 
@@ -65,31 +62,47 @@ export default function SignUpScreen() {
 
     setLoading(true);
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
-
-      await setDoc(doc(db, 'users', user.uid), {
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
-        tribe: tribe.trim(),
-        phone: phone.trim(),
+      // Inscription avec Supabase Auth
+      const { data: authData, error: authError } = await supabase.auth.signUp({
         email: email.trim().toLowerCase(),
-        isPremium: false,
-        createdAt: new Date(),
+        password: password,
+        options: {
+          data: {
+            first_name: firstName.trim(),
+            last_name: lastName.trim(),
+            phone: phone.trim(),
+          }
+        }
       });
 
-      Alert.alert('Succès', 'Compte créé avec succès !');
-      router.push('/login');
+      if (authError) throw authError;
+
+      if (authData.user) {
+        // Création du profil dans la table profiles
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert({
+            id: authData.user.id,
+            first_name: firstName.trim(),
+            last_name: lastName.trim(),
+            tribe: tribe.trim(),
+            phone: phone.trim(),
+            email: email.trim().toLowerCase(),
+            is_premium: false,
+            created_at: new Date().toISOString(),
+          });
+
+        if (profileError) throw profileError;
+
+        Alert.alert('Succès', 'Compte créé avec succès !');
+        router.push('/login');
+      }
     } catch (error: any) {
       console.error('Erreur création compte:', error);
-      let errorMessage = "Une erreur s'est produite lors de la création du compte.";
+      let errorMessage = error.message || 'Une erreur est survenue lors de la création du compte';
       
-      if (error.code === 'auth/email-already-in-use') {
-        errorMessage = "Cette adresse email est déjà utilisée.";
-      } else if (error.code === 'auth/weak-password') {
-        errorMessage = "Le mot de passe est trop faible.";
-      } else if (error.code === 'auth/invalid-email') {
-        errorMessage = "L'adresse email n'est pas valide.";
+      if (error.message.includes('already registered')) {
+        errorMessage = 'Un compte avec cet email existe déjà';
       }
       
       Alert.alert('Erreur', errorMessage);
@@ -176,6 +189,7 @@ export default function SignUpScreen() {
                   onChangeText={setPassword}
                   style={[styles.input, { flex: 1, marginBottom: 0, borderWidth: 0 }]}
                   secureTextEntry={!showPassword}
+                  autoCapitalize="none"
                 />
                 <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeIcon}>
                   <Ionicons name={showPassword ? 'eye-off' : 'eye'} size={22} color="#8B0000" />
@@ -193,6 +207,7 @@ export default function SignUpScreen() {
                   onChangeText={setConfirmPassword}
                   style={[styles.input, { flex: 1, marginBottom: 0, borderWidth: 0 }]}
                   secureTextEntry={!showConfirmPassword}
+                  autoCapitalize="none"
                 />
                 <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)} style={styles.eyeIcon}>
                   <Ionicons name={showConfirmPassword ? 'eye-off' : 'eye'} size={22} color="#8B0000" />

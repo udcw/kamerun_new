@@ -1,7 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { signInWithEmailAndPassword } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
@@ -16,17 +14,15 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { auth, db } from '../../firebase/kamerun';
-
+import { supabase } from '../../lib/supabase';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-
   const [loading, setLoading] = useState(false);
 
-  const router = useRouter(); // navigation
+  const router = useRouter();
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -36,25 +32,42 @@ export default function LoginScreen() {
 
     setLoading(true);
     try {
-      // connexion avec Firebase Auth
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
+      // Connexion avec Supabase
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email.trim().toLowerCase(),
+        password: password,
+      });
 
-      // récupération des infos supplémentaires depuis Firestore
-      const docRef = doc(db, 'users', user.uid);
-      const docSnap = await getDoc(docRef);
-
-      if (docSnap.exists()) {
-        const userData = docSnap.data();
-        console.log('Infos utilisateur:', userData); // tu peux les passer à l'écran d'accueil
-      } else {
-        console.log('Aucune info trouvée pour cet utilisateur.');
+      if (error) {
+        throw error;
       }
 
-      Alert.alert('Succès', 'Connexion réussie !');
-      router.replace('/(tabs)/AppDrawer'); // redirige vers la page d'accueil
+      if (data.user) {
+        // Récupération des infos utilisateur depuis la table profiles
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', data.user.id)
+          .single();
+
+        if (profileError) {
+          console.log('Erreur profil:', profileError);
+        } else {
+          console.log('Infos utilisateur:', profile);
+        }
+
+        Alert.alert('Succès', 'Connexion réussie !');
+        router.replace('/(tabs)/AppDrawer');
+      }
     } catch (error: any) {
-      Alert.alert('Erreur', error.message);
+      console.error('Erreur connexion:', error);
+      let errorMessage = 'Une erreur est survenue';
+      
+      if (error.message.includes('Invalid login credentials')) {
+        errorMessage = 'Email ou mot de passe incorrect';
+      }
+      
+      Alert.alert('Erreur', errorMessage);
     } finally {
       setLoading(false);
     }
@@ -80,26 +93,26 @@ export default function LoginScreen() {
               onChangeText={setEmail}
               style={styles.input}
               keyboardType="email-address"
+              autoCapitalize="none"
             />
-        <View style={styles.passwordContainer}>
-  <TextInput
-    placeholder="Mot de passe"
-    value={password}
-    onChangeText={setPassword}
-    // style={[styles.input, { flex: 1 }]}
-  
-    secureTextEntry={!showPassword}
-  />
-  <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-    <Ionicons
-      name={showPassword ? 'eye' : 'eye-off'}
-      size={24}
-      color="#8B0000"
-      style={{ marginLeft: 150, padding: 5 }}
-    />
-  </TouchableOpacity>
-</View>
-
+            
+            <View style={styles.passwordContainer}>
+              <TextInput
+                placeholder="Mot de passe"
+                value={password}
+                onChangeText={setPassword}
+                style={styles.passwordInput}
+                secureTextEntry={!showPassword}
+                autoCapitalize="none"
+              />
+              <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+                <Ionicons
+                  name={showPassword ? 'eye' : 'eye-off'}
+                  size={24}
+                  color="#8B0000"
+                />
+              </TouchableOpacity>
+            </View>
 
             <TouchableOpacity
               style={[styles.button, loading && { backgroundColor: '#aaa' }]}
@@ -156,6 +169,21 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     backgroundColor: '#FFF8DC',
   },
+  passwordContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#8B0000',
+    borderRadius: 10,
+    paddingHorizontal: 15,
+    height: 50,
+    marginBottom: 15,
+    backgroundColor: '#FFF8DC',
+  },
+  passwordInput: {
+    flex: 1,
+    height: '100%',
+  },
   button: {
     backgroundColor: '#FF8C00',
     paddingVertical: 15,
@@ -178,16 +206,4 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#8B0000',
   },
-  passwordContainer: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  borderWidth: 1,
-  borderColor: '#8B0000',
-  borderRadius: 10,
-  paddingHorizontal: 10,
-  height: 50,
-  marginBottom: 15,
-  backgroundColor: '#FFF8DC',
-},
-
 });

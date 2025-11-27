@@ -1,5 +1,3 @@
-import { signOut } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
 import {
   Image,
@@ -7,21 +5,31 @@ import {
   Text,
   TouchableOpacity,
   View,
-  ScrollView
+  ScrollView,
+  Alert
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { auth, db } from '../../firebase/kamerun';
+import { supabase } from '../../lib/supabase';
+import { useRouter } from 'expo-router';
 
-export default function ProfileScreen({ navigation }: any) {
+export default function ProfileScreen() {
   const [userData, setUserData] = useState<any>(null);
+  const router = useRouter();
 
   useEffect(() => {
     const fetchUserData = async () => {
-      if (auth.currentUser) {
-        const docRef = doc(db, 'users', auth.currentUser.uid);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          setUserData(docSnap.data());
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+        
+        if (error) {
+          console.error('Erreur récupération profil:', error);
+        } else {
+          setUserData(profile);
         }
       }
     };
@@ -29,8 +37,12 @@ export default function ProfileScreen({ navigation }: any) {
   }, []);
 
   const handleLogout = async () => {
-    await signOut(auth);
-    navigation.replace('login');
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      Alert.alert('Erreur', 'Erreur lors de la déconnexion');
+    } else {
+      router.replace('/login');
+    }
   };
 
   return (
@@ -43,7 +55,7 @@ export default function ProfileScreen({ navigation }: any) {
           source={require('@/assets/images/a.jpg')} 
           style={styles.avatar} 
         />
-        {userData?.isPremium && (
+        {userData?.is_premium && (
           <View style={styles.premiumBadge}>
             <Ionicons name="star" size={16} color="#FFD700" />
             <Text style={styles.premiumText}>Premium</Text>
@@ -55,11 +67,11 @@ export default function ProfileScreen({ navigation }: any) {
         <View style={styles.infoContainer}>
           <View style={styles.infoRow}>
             <Text style={styles.label}>Nom :</Text>
-            <Text style={styles.value}>{userData.lastName}</Text>
+            <Text style={styles.value}>{userData.last_name}</Text>
           </View>
           <View style={styles.infoRow}>
             <Text style={styles.label}>Prénom :</Text>
-            <Text style={styles.value}>{userData.firstName}</Text>
+            <Text style={styles.value}>{userData.first_name}</Text>
           </View>
           <View style={styles.infoRow}>
             <Text style={styles.label}>Email :</Text>
@@ -75,15 +87,15 @@ export default function ProfileScreen({ navigation }: any) {
           </View>
           <View style={styles.infoRow}>
             <Text style={styles.label}>Statut :</Text>
-            <Text style={[styles.value, userData.isPremium ? styles.premiumValue : styles.freeValue]}>
-              {userData.isPremium ? 'Premium' : 'Gratuit'}
+            <Text style={[styles.value, userData.is_premium ? styles.premiumValue : styles.freeValue]}>
+              {userData.is_premium ? 'Premium' : 'Gratuit'}
             </Text>
           </View>
-          {userData.isPremium && userData.premiumActivatedAt && (
+          {userData.is_premium && userData.premium_activated_at && (
             <View style={styles.infoRow}>
               <Text style={styles.label}>Premium depuis :</Text>
               <Text style={styles.value}>
-                {new Date(userData.premiumActivatedAt.toDate()).toLocaleDateString('fr-FR')}
+                {new Date(userData.premium_activated_at).toLocaleDateString('fr-FR')}
               </Text>
             </View>
           )}

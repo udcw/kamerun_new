@@ -1,24 +1,21 @@
 import { Slot, useRouter } from 'expo-router';
-import { onAuthStateChanged } from 'firebase/auth';
 import React, { useEffect } from 'react';
-import { auth } from '../../firebase/kamerun';
+import { supabase } from '../../lib/supabase';
 
 export default function RootLayout() {
   const router = useRouter();
 
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session) {
+        router.replace('/(tabs)/AppDrawer'); // utilisateur connecté
+      } else {
+        router.replace('/login'); // utilisateur non connecté
+      }
+    });
 
-useEffect(() => {
-  const unsubscribe = onAuthStateChanged(auth, (user) => {
-    if (user) {
-      router.replace('/AppDrawer'); // utilisateur connecté
-    } else {
-      router.replace('/login'); // utilisateur non connecté
-    }
-  });
-
-  return unsubscribe;
-}, []);
-
+    return () => subscription.unsubscribe();
+  }, []);
 
   return <Slot />;
 }

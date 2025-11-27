@@ -1,4 +1,3 @@
-// @ts-ignore
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { 
@@ -17,11 +16,10 @@ import {
   Linking 
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { auth, db } from '../../firebase/kamerun';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { supabase } from '../../lib/supabase';
 
 // Configuration du backend
-const BACKEND_URL = 'https://severbackendnotchpay.onrender.com'; // Remplacez par votre URL de production
+const BACKEND_URL = 'https://severbackendnotchpay.onrender.com';
 
 // Méthodes de paiement supportées
 const PAYMENT_METHODS = [
@@ -90,12 +88,14 @@ class PaymentService {
 
   static async getUserPremiumStatus(userId: string) {
     try {
-      const userDoc = await getDoc(doc(db, 'users', userId));
-      if (userDoc.exists()) {
-        const data = userDoc.data();
-        return { isPremium: data.isPremium || false };
-      }
-      return { isPremium: false };
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('is_premium')
+        .eq('id', userId)
+        .single();
+
+      if (error) throw error;
+      return { isPremium: profile?.is_premium || false };
     } catch (error) {
       console.error('Erreur statut premium:', error);
       return { isPremium: false };
@@ -179,15 +179,43 @@ export default function HomeScreen() {
   }, []);
 
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged(async (user) => {
-      setUser(user);
-      if (user) {
-        const userDoc = await getDoc(doc(db, 'users', user.uid));
-        if (userDoc.exists()) {
-          const data = userDoc.data();
-          setUserData(data);
-          setIsPremium(data.isPremium || false);
-          setPhoneNumber(data.phone || '');
+    const getSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setUser(session?.user || null);
+      
+      if (session?.user) {
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .single();
+        
+        if (!error && profile) {
+          setUserData(profile);
+          setIsPremium(profile.is_premium || false);
+          setPhoneNumber(profile.phone || '');
+        }
+      }
+      setLoading(false);
+    };
+
+    getSession();
+
+    // Écouter les changements d'authentification
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      setUser(session?.user || null);
+      
+      if (session?.user) {
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .single();
+        
+        if (!error && profile) {
+          setUserData(profile);
+          setIsPremium(profile.is_premium || false);
+          setPhoneNumber(profile.phone || '');
         }
       } else {
         setIsPremium(false);
@@ -195,7 +223,8 @@ export default function HomeScreen() {
       }
       setLoading(false);
     });
-    return unsubscribe;
+
+    return () => subscription.unsubscribe();
   }, []);
 
   const handleBackendPayment = () => {
@@ -254,9 +283,9 @@ export default function HomeScreen() {
         1000, // 1000 FCFA
         phoneNumber,
         method,
-        user.uid,
+        user.id,
         userData?.email,
-        `${userData?.firstName} ${userData?.lastName}`
+        `${userData?.first_name} ${userData?.last_name}`
       );
 
       if (paymentResult.success && paymentResult.data?.transaction?.reference) {
@@ -334,14 +363,19 @@ export default function HomeScreen() {
       const status = await PaymentService.verifyPayment(transactionId);
       
       if (status.paid) {
-        // Paiement réussi - mettre à jour le statut premium dans Firebase
+        // Paiement réussi - mettre à jour le statut premium dans Supabase
         try {
           if (user) {
-            await updateDoc(doc(db, 'users', user.uid), {
-              isPremium: true,
-              premiumActivatedAt: new Date(),
-              lastPaymentDate: new Date()
-            });
+            const { error } = await supabase
+              .from('profiles')
+              .update({ 
+                is_premium: true,
+                premium_activated_at: new Date().toISOString(),
+                last_payment_date: new Date().toISOString()
+              })
+              .eq('id', user.id);
+            
+            if (error) throw error;
             
             Alert.alert('Succès', 'Paiement confirmé! Accès premium activé.');
             setIsPremium(true);
