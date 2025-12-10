@@ -72,6 +72,48 @@ export default function LoginScreen() {
         errorMap[err.message] ?? "Une erreur est survenue. Réessayez.";
   
       Alert.alert("Erreur", message);
+      Alert.alert('Erreur', 'Veuillez remplir tous les champs.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Connexion avec Supabase
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email.trim().toLowerCase(),
+        password: password,
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      if (data.user) {
+        // Récupération des infos utilisateur depuis la table profiles
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', data.user.id)
+          .single();
+
+        if (profileError) {
+          console.log('Erreur profil:', profileError);
+        } else {
+          console.log('Infos utilisateur:', profile);
+        }
+
+        Alert.alert('Succès', 'Connexion réussie !');
+        router.replace('/(tabs)/AppDrawer');
+      }
+    } catch (error: any) {
+      console.error('Erreur connexion:', error);
+      let errorMessage = 'Une erreur est survenue';
+      
+      if (error.message.includes('Invalid login credentials')) {
+        errorMessage = 'Email ou mot de passe incorrect';
+      }
+      
+      Alert.alert('Erreur', errorMessage);
     } finally {
       setLoading(false);
     }

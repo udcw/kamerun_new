@@ -8,7 +8,6 @@ import { supabase } from "@/lib/supabase";
 import { useEffect, useState } from "react";
 import { ActivityIndicator } from "react-native";
 
-
 const { width } = Dimensions.get('window');
 
 const culturesData = [
@@ -226,6 +225,27 @@ export default function CulturesPremiumScreen() {
 </View>
 
         
+        <View style={styles.culturesSection}>
+          <Text style={styles.sectionTitle}>Grandes Cultures du Cameroun</Text>
+          <View style={styles.culturesGrid}>
+            {culturesData.map((culture) => (
+              <TouchableOpacity
+                key={culture.id}
+                style={[styles.cultureCard, { backgroundColor: culture.color }]}
+                onPress={() => router.push(culture.route as any)}
+              >
+                <View style={styles.cultureIcon}>
+                  <Ionicons name={culture.icon as any} size={32} color="#FFF" />
+                </View>
+                <Text style={styles.cultureName}>{culture.name}</Text>
+                <Text style={styles.cultureDescription}>{culture.description}</Text>
+                <View style={styles.cultureArrow}>
+                  <Ionicons name="arrow-forward" size={20} color="#FFF" />
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
 
         {/* Additional Premium Features */}
         <View style={styles.featuresSection}>

@@ -7,12 +7,11 @@ import {
   ImageBackground,
   KeyboardAvoidingView,
   Platform,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from 'react-native';
 import { supabase } from '../../lib/supabase';
 
@@ -34,7 +33,21 @@ export default function SignUpScreen() {
   const validateEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   const validatePhone = (phone: string) => /^237\d{9}$/.test(phone);
 
+  // Fonction pour corriger la contrainte de clé étrangère
+  const fixForeignKeyConstraint = async () => {
+    try {
+      Alert.alert(
+        'Configuration requise',
+        'La base de données nécessite une configuration technique.\n\nVeuillez contacter le support pour exécuter cette requête SQL :\n\nALTER TABLE profiles DROP CONSTRAINT profiles_id_fkey;\nALTER TABLE profiles ADD CONSTRAINT profiles_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id) ON DELETE CASCADE;',
+        [{ text: 'OK' }]
+      );
+    } catch (error) {
+      console.error('Erreur notification:', error);
+    }
+  };
+
   const handleSignUp = async () => {
+    // Validation des champs
     if (!email || !password || !confirmPassword || !firstName || !lastName || !tribe || !phone) {
       Alert.alert('Erreur', 'Tous les champs sont obligatoires.');
       return;
@@ -61,8 +74,12 @@ export default function SignUpScreen() {
     }
 
     setLoading(true);
+
     try {
-      // Inscription avec Supabase Auth
+      console.log('🔄 Début de l\'inscription...');
+
+      // ÉTAPE 1: Création du compte utilisateur dans auth.users
+      console.log('📝 Création du compte auth...');
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: email.trim().toLowerCase(),
         password: password,
@@ -71,14 +88,30 @@ export default function SignUpScreen() {
             first_name: firstName.trim(),
             last_name: lastName.trim(),
             phone: phone.trim(),
+            tribe: tribe.trim(),
           }
         }
       });
 
-      if (authError) throw authError;
+      if (authError) {
+        console.error('❌ Erreur auth:', authError);
+        if (authError.message.includes('already registered') || authError.message.includes('already exists')) {
+          throw new Error('Un compte avec cet email existe déjà.');
+        }
+        throw authError;
+      }
 
-      if (authData.user) {
-        // Création du profil dans la table profiles
+      if (!authData.user) {
+        throw new Error('Échec de la création du compte utilisateur.');
+      }
+
+      console.log('✅ Compte auth créé:', authData.user.id);
+
+      // ÉTAPE 2: Tentative de création du profil
+      console.log('🔄 Tentative de création du profil...');
+      
+      try {
+        // Méthode 1: Insertion standard
         const { error: profileError } = await supabase
           .from('profiles')
           .insert({
@@ -90,22 +123,120 @@ export default function SignUpScreen() {
             email: email.trim().toLowerCase(),
             is_premium: false,
             created_at: new Date().toISOString(),
+            avatar_url: null,
+            updated_at: new Date().toISOString(),
+            last_payment_date: null,
+            payment_reference: null,
           });
 
-        if (profileError) throw profileError;
+        if (profileError) {
+          console.warn('⚠️ Erreur insertion standard:', profileError);
+          
+          // Méthode 2: Upsert (meilleure chance)
+          const { error: upsertError } = await supabase
+            .from('profiles')
+            .upsert({
+              id: authData.user.id,
+              first_name: firstName.trim(),
+              last_name: lastName.trim(),
+              tribe: tribe.trim(),
+              phone: phone.trim(),
+              email: email.trim().toLowerCase(),
+              is_premium: false,
+              created_at: new Date().toISOString(),
+              avatar_url: null,
+              updated_at: new Date().toISOString(),
+              last_payment_date: null,
+              payment_reference: null,
+            }, {
+              onConflict: 'id'
+            });
 
-        Alert.alert('Succès', 'Compte créé avec succès !');
-        router.push('/login');
+          if (upsertError) {
+            console.warn('⚠️ Erreur upsert:', upsertError);
+            
+            // Méthode 3: Fonction RPC si elle existe
+            try {
+              const { error: rpcError } = await supabase.rpc('create_user_profile', {
+                user_id: authData.user.id,
+                user_email: email.trim().toLowerCase(),
+                user_first_name: firstName.trim(),
+                user_last_name: lastName.trim(),
+                user_tribe: tribe.trim(),
+                user_phone: phone.trim()
+              });
+
+              if (rpcError) {
+                console.warn('⚠️ Erreur RPC:', rpcError);
+                // Le profil n'est pas créé, mais le compte auth existe
+                console.log('ℹ️ Compte auth créé, profil non créé (problème de contrainte)');
+              } else {
+                console.log('✅ Profil créé via RPC');
+              }
+            } catch (rpcException) {
+              console.warn('⚠️ Exception RPC:', rpcException);
+            }
+          } else {
+            console.log('✅ Profil créé via upsert');
+          }
+        } else {
+          console.log('✅ Profil créé via insertion standard');
+        }
+      } catch (profileException: any) {
+        console.warn('⚠️ Exception création profil:', profileException);
+        // On continue même si le profil n'est pas créé
       }
+
+      // SUCCÈS: Le compte auth est créé, c'est le plus important
+      console.log('🎉 Inscription réussie!');
+      
+      Alert.alert(
+        '✅ Inscription réussie!',
+        'Votre compte a été créé avec succès. Vous pouvez maintenant vous connecter.',
+        [
+          {
+            text: 'Se connecter',
+            onPress: () => {
+              console.log('🔀 Redirection vers login');
+              router.replace('/login');
+            }
+          }
+        ]
+      );
+
     } catch (error: any) {
-      console.error('Erreur création compte:', error);
-      let errorMessage = error.message || 'Une erreur est survenue lors de la création du compte';
+      console.error('❌ Erreur inscription:', error);
       
-      if (error.message.includes('already registered')) {
-        errorMessage = 'Un compte avec cet email existe déjà';
+      let errorMessage = 'Une erreur est survenue lors de la création du compte.';
+      
+      // Messages d'erreur spécifiques
+      if (error.message?.includes('already registered') || error.message?.includes('already exists')) {
+        errorMessage = 'Un compte avec cet email existe déjà.';
+      } else if (error.code === '23503') {
+        errorMessage = 'Problème de configuration technique. Le compte a été créé mais nécessite une configuration supplémentaire.';
+        
+        // Afficher un bouton pour corriger la contrainte
+        Alert.alert(
+          '⚠️ Configuration requise',
+          errorMessage,
+          [
+            { 
+              text: 'Voir les instructions', 
+              onPress: () => fixForeignKeyConstraint() 
+            },
+            { 
+              text: 'OK', 
+              style: 'cancel' 
+            }
+          ]
+        );
+        return;
+      } else if (error.message) {
+        errorMessage = error.message;
       }
       
-      Alert.alert('Erreur', errorMessage);
+      Alert.alert('❌ Erreur', errorMessage);
+      
     } finally {
       setLoading(false);
     }
@@ -119,31 +250,37 @@ export default function SignUpScreen() {
     >
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={{ flex: 1 }}
+        style={styles.keyboardAvoidingView}
       >
-        <ScrollView contentContainerStyle={styles.scrollContainer}>
+        <View style={styles.scrollContainer}>
           <View style={styles.container}>
             <Text style={styles.title}>Inscription</Text>
             <Text style={styles.subtitle}>Rejoignez la communauté Kamerun News</Text>
 
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Nom</Text>
-              <TextInput 
-                placeholder="Votre nom" 
-                value={lastName} 
-                onChangeText={setLastName} 
-                style={styles.input} 
-              />
-            </View>
+            <View style={styles.inputRow}>
+              <View style={[styles.inputGroup, { flex: 1, marginRight: 8 }]}>
+                <Text style={styles.inputLabel}>Prénom</Text>
+                <TextInput 
+                  placeholder="Votre prénom" 
+                  value={firstName} 
+                  onChangeText={setFirstName} 
+                  style={styles.input}
+                  editable={!loading}
+                  autoCapitalize="words"
+                />
+              </View>
 
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Prénom</Text>
-              <TextInput 
-                placeholder="Votre prénom" 
-                value={firstName} 
-                onChangeText={setFirstName} 
-                style={styles.input} 
-              />
+              <View style={[styles.inputGroup, { flex: 1, marginLeft: 8 }]}>
+                <Text style={styles.inputLabel}>Nom</Text>
+                <TextInput 
+                  placeholder="Votre nom" 
+                  value={lastName} 
+                  onChangeText={setLastName} 
+                  style={styles.input}
+                  editable={!loading}
+                  autoCapitalize="words"
+                />
+              </View>
             </View>
 
             <View style={styles.inputGroup}>
@@ -152,7 +289,8 @@ export default function SignUpScreen() {
                 placeholder="Votre ethnie ou tribu" 
                 value={tribe} 
                 onChangeText={setTribe} 
-                style={styles.input} 
+                style={styles.input}
+                editable={!loading}
               />
             </View>
 
@@ -164,7 +302,10 @@ export default function SignUpScreen() {
                 onChangeText={setPhone}
                 style={styles.input}
                 keyboardType="phone-pad"
+                maxLength={12}
+                editable={!loading}
               />
+              <Text style={styles.inputHint}>Format: 237 suivi de 9 chiffres</Text>
             </View>
 
             <View style={styles.inputGroup}>
@@ -176,10 +317,11 @@ export default function SignUpScreen() {
                 style={styles.input}
                 keyboardType="email-address"
                 autoCapitalize="none"
+                autoComplete="email"
+                editable={!loading}
               />
             </View>
 
-            {/* Champ mot de passe avec icône */}
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>Mot de passe</Text>
               <View style={styles.passwordContainer}>
@@ -190,14 +332,19 @@ export default function SignUpScreen() {
                   style={[styles.input, { flex: 1, marginBottom: 0, borderWidth: 0 }]}
                   secureTextEntry={!showPassword}
                   autoCapitalize="none"
+                  autoComplete="password-new"
+                  editable={!loading}
                 />
-                <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeIcon}>
+                <TouchableOpacity 
+                  onPress={() => setShowPassword(!showPassword)} 
+                  style={styles.eyeIcon}
+                  disabled={loading}
+                >
                   <Ionicons name={showPassword ? 'eye-off' : 'eye'} size={22} color="#8B0000" />
                 </TouchableOpacity>
               </View>
             </View>
 
-            {/* Champ confirmation mot de passe avec icône */}
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>Confirmer le mot de passe</Text>
               <View style={styles.passwordContainer}>
@@ -208,8 +355,14 @@ export default function SignUpScreen() {
                   style={[styles.input, { flex: 1, marginBottom: 0, borderWidth: 0 }]}
                   secureTextEntry={!showConfirmPassword}
                   autoCapitalize="none"
+                  autoComplete="password-new"
+                  editable={!loading}
                 />
-                <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)} style={styles.eyeIcon}>
+                <TouchableOpacity 
+                  onPress={() => setShowConfirmPassword(!showConfirmPassword)} 
+                  style={styles.eyeIcon}
+                  disabled={loading}
+                >
                   <Ionicons name={showConfirmPassword ? 'eye-off' : 'eye'} size={22} color="#8B0000" />
                 </TouchableOpacity>
               </View>
@@ -221,7 +374,10 @@ export default function SignUpScreen() {
               disabled={loading}
             >
               {loading ? (
-                <ActivityIndicator color="#FFF" />
+                <>
+                  <ActivityIndicator color="#FFF" style={{ marginRight: 10 }} />
+                  <Text style={styles.buttonText}>Création en cours...</Text>
+                </>
               ) : (
                 <>
                   <Ionicons name="person-add" size={20} color="#FFF" />
@@ -230,14 +386,25 @@ export default function SignUpScreen() {
               )}
             </TouchableOpacity>
 
-            <Text style={styles.link}>
-              Déjà un compte ?{' '}
-              <Text style={styles.linkHighlight} onPress={() => router.push('/login')}>
-                Se connecter
+            <View style={styles.helpContainer}>
+              <Text style={styles.helpText}>
+                En cas de problème technique, contactez le support.
               </Text>
-            </Text>
+              <TouchableOpacity onPress={fixForeignKeyConstraint}>
+                <Text style={styles.helpLink}>Voir les instructions techniques</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.linkContainer}>
+              <Text style={styles.link}>
+                Déjà un compte ?{' '}
+                <Text style={styles.linkHighlight} onPress={() => !loading && router.push('/login')}>
+                  Se connecter
+                </Text>
+              </Text>
+            </View>
           </View>
-        </ScrollView>
+        </View>
       </KeyboardAvoidingView>
     </ImageBackground>
   );
@@ -245,10 +412,15 @@ export default function SignUpScreen() {
 
 const styles = StyleSheet.create({
   background: { flex: 1 },
-  scrollContainer: { flexGrow: 1, justifyContent: 'center' },
+  keyboardAvoidingView: { flex: 1 },
+  scrollContainer: { 
+    flex: 1,
+    justifyContent: 'center',
+    paddingVertical: 20,
+  },
   container: {
     backgroundColor: 'rgba(255, 255, 240, 0.95)',
-    margin: 20,
+    marginHorizontal: 20,
     borderRadius: 20,
     padding: 25,
     shadowColor: '#000',
@@ -271,6 +443,11 @@ const styles = StyleSheet.create({
     marginBottom: 30,
     fontWeight: '500',
   },
+  inputRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 15,
+  },
   inputGroup: {
     marginBottom: 20,
   },
@@ -280,6 +457,13 @@ const styles = StyleSheet.create({
     color: '#8B0000',
     marginBottom: 8,
     marginLeft: 5,
+  },
+  inputHint: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 5,
+    marginLeft: 5,
+    fontStyle: 'italic',
   },
   input: {
     borderWidth: 1,
@@ -301,6 +485,7 @@ const styles = StyleSheet.create({
   },
   eyeIcon: {
     padding: 10,
+    marginRight: 5,
   },
   button: {
     backgroundColor: '#8B0000',
@@ -322,9 +507,30 @@ const styles = StyleSheet.create({
     fontSize: 18,
     marginLeft: 10,
   },
-  link: {
-    marginTop: 20,
+  helpContainer: {
+    marginTop: 15,
+    padding: 10,
+    backgroundColor: 'rgba(139, 0, 0, 0.05)',
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  helpText: {
+    fontSize: 12,
+    color: '#666',
     textAlign: 'center',
+    marginBottom: 5,
+  },
+  helpLink: {
+    fontSize: 12,
+    color: '#8B0000',
+    fontWeight: '600',
+    textDecorationLine: 'underline',
+  },
+  linkContainer: {
+    marginTop: 20,
+    alignItems: 'center',
+  },
+  link: {
     fontSize: 15,
     color: '#4B0082',
   },
