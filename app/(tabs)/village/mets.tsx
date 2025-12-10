@@ -1,3 +1,4 @@
+import { USE_FIREBASE, getStorageUrl, getVillageSubcollection } from "@/firebase/kamerun";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
@@ -9,6 +10,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+<<<<<<< HEAD
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -20,6 +22,39 @@ interface Met {
   name: string;
   description: string | null;
   image_url: string | null;
+=======
+  View
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+
+// Données statiques
+const STATIC_METS = [
+  {
+    id: "1",
+    name: "Nkui",
+    desc: "Soupe traditionnelle Bamiléké à base de fibre de liane.",
+    image: "https://i.imgur.com/Yy8qYfM.jpeg",
+  },
+  {
+    id: "2",
+    name: "Koki",
+    desc: "Gâteau de haricots jaunes cuit à la vapeur.",
+    image: "https://i.imgur.com/DR1C9uT.jpeg",
+  },
+  {
+    id: "3",
+    name: "Mbongo Tchobi",
+    desc: "Ragoût noir épicé, spécialité Sawa.",
+    image: "https://i.imgur.com/TDFBsY6.jpeg",
+  }
+];
+
+interface Dish {
+  id: string;
+  name: string;
+  desc: string;
+  image: string;
+>>>>>>> 0d6338c (Préparation du projet a recevoir les données dynamiques depuis la base de données de Firebase)
 }
 
 export default function MetsPage() {
@@ -30,6 +65,7 @@ export default function MetsPage() {
     data = JSON.parse(village as string);
   } catch (e) {
     console.warn("Village invalide :", village);
+<<<<<<< HEAD
     data = { id: null, name: "Village inconnu" };
   }
 
@@ -68,11 +104,55 @@ export default function MetsPage() {
     } catch (err: any) {
       console.error("Erreur chargement mets:", err);
       setError(err.message || "Erreur lors du chargement des mets");
+=======
+    data = { name: "Village inconnu", id: "" };
+  }
+
+  const router = useRouter();
+  const [mets, setMets] = useState<Dish[]>(STATIC_METS);
+  const [loading, setLoading] = useState(false);
+  const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    if (USE_FIREBASE && data.id) {
+      loadFirebaseData();
+    } else {
+      setMets(STATIC_METS);
+    }
+  }, []);
+
+  const loadFirebaseData = async () => {
+    setLoading(true);
+    try {
+      const docs = await getVillageSubcollection(data?.name?.toLowerCase(), 'mets');
+      
+      const formattedData = await Promise.all(
+        docs.map(async (doc: any) => {
+          let imageUrl = "";
+          if (doc.imageUrl) {
+            imageUrl = await getStorageUrl(doc.imageUrl);
+          }
+          
+          return {
+            id: doc.id,
+            name: doc.name || "",
+            desc: doc.description || "",
+            image: imageUrl || "https://placehold.co/600x400/png",
+          };
+        })
+      );
+      
+      setMets(formattedData);
+    } catch (error) {
+      console.error("Erreur chargement mets:", error);
+      setMets(STATIC_METS);
+>>>>>>> 0d6338c (Préparation du projet a recevoir les données dynamiques depuis la base de données de Firebase)
     } finally {
       setLoading(false);
     }
   };
 
+<<<<<<< HEAD
   // Filtrer les résultats
   const filtered = mets.filter((m) =>
     m.name.toLowerCase().includes((search || "").toLowerCase())
@@ -107,12 +187,26 @@ export default function MetsPage() {
             <Text style={styles.retryText}>Réessayer</Text>
           </TouchableOpacity>
         </View>
+=======
+  const filtered = mets.filter(m =>
+    m.name.toLowerCase().includes((search || "").toLowerCase())
+  );
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <ActivityIndicator size="large" color="#0A84FF" style={{ marginTop: 50 }} />
+        <Text style={{ textAlign: 'center', marginTop: 20, color: '#666' }}>
+          Chargement des mets...
+        </Text>
+>>>>>>> 0d6338c (Préparation du projet a recevoir les données dynamiques depuis la base de données de Firebase)
       </SafeAreaView>
     );
   }
 
   return (
     <SafeAreaView style={styles.container}>
+<<<<<<< HEAD
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color="#0A84FF" />
@@ -126,6 +220,19 @@ export default function MetsPage() {
       </Text>
 
       {/* Barre de recherche */}
+=======
+      <Text style={styles.title}>Mets de {data.name}</Text>
+      <Text style={styles.subtitle}>Découvrez les plats traditionnels du village</Text>
+      
+      <Text style={styles.modeIndicator}>
+        Mode: {USE_FIREBASE ? 'Firebase' : 'Statique'}
+      </Text>
+      
+      <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <Text style={styles.backText}>← Retour</Text>
+      </TouchableOpacity>
+
+>>>>>>> 0d6338c (Préparation du projet a recevoir les données dynamiques depuis la base de données de Firebase)
       <View style={styles.searchBox}>
         <Ionicons name="search" size={20} color="#666" />
         <TextInput
@@ -228,6 +335,20 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
+    fontSize: 16,
+  },
+
+  modeIndicator: {
+    fontSize: 12,
+    color: "#666",
+    marginBottom: 8,
+    fontStyle: "italic",
+  },
+  backButton: {
+    marginBottom: 12,
+  },
+  backText: {
+    color: "#0A84FF",
     fontSize: 16,
   },
 

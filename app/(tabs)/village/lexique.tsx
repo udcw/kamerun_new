@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+<<<<<<< HEAD
 import { supabase } from "@/lib/supabase";
 
 interface LexiqueEntry {
@@ -20,6 +21,23 @@ interface LexiqueEntry {
   french: string;
   local: string;
   audio_url: string | null;
+=======
+import { USE_FIREBASE, getStorageUrl, getVillageSubcollection } from "@/firebase/kamerun";
+
+// Données statiques de test
+const STATIC_LEXIQUE = [
+  { id: "1", mot: "Bonjour", trad: "Mbô", audio: require("@/assets/audio/bonjour.mp3") },
+  { id: "2", mot: "Merci", trad: "Akiba", audio: null },
+  { id: "3", mot: "Maison", trad: "Ndá", audio: null },
+  { id: "4", mot: "Eau", trad: "Mâ", audio: null },
+];
+
+interface LexiqueItem {
+  id: string;
+  mot: string;
+  trad: string;
+  audio: any;
+>>>>>>> 0d6338c (Préparation du projet a recevoir les données dynamiques depuis la base de données de Firebase)
 }
 
 export default function LexiquePage() {
@@ -28,6 +46,7 @@ export default function LexiquePage() {
 
   try {
     data = JSON.parse(village as string);
+<<<<<<< HEAD
   } catch (e) {
     console.warn("⚠️ Paramètre 'village' invalide :", village);
     data = { id: null, name: "Village inconnu" };
@@ -38,9 +57,21 @@ export default function LexiquePage() {
   const [lexique, setLexique] = useState<LexiqueEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+=======
+    console.log("ℹ Village chargé :", data);
+  } catch (e) {
+    console.warn("⚠️ Paramètre 'village' invalide :", village);
+    data = { name: "Village inconnu", id: "" };
+  }
+
+  const router = useRouter();
+  const [lexique, setLexique] = useState<LexiqueItem[]>(STATIC_LEXIQUE);
+  const [loading, setLoading] = useState(false);
+>>>>>>> 0d6338c (Préparation du projet a recevoir les données dynamiques depuis la base de données de Firebase)
   const [search, setSearch] = useState("");
   const [currentSound, setCurrentSound] = useState<Audio.Sound | null>(null);
 
+<<<<<<< HEAD
   // Charger les données depuis Supabase
   useEffect(() => {
     if (!data?.id) {
@@ -76,11 +107,50 @@ export default function LexiquePage() {
     } catch (err: any) {
       console.error("Erreur chargement lexique:", err);
       setError(err.message || "Erreur lors du chargement du lexique");
+=======
+  // Chargement des données Firebase ou statiques
+  useEffect(() => {
+    if (USE_FIREBASE && data?.id) {
+      loadFirebaseData();
+    } else {
+      setLexique(STATIC_LEXIQUE);
+    }
+  }, []);
+
+  const loadFirebaseData = async () => {
+    setLoading(true);
+    try {
+      const docs = await getVillageSubcollection(data?.name?.toLowerCase(), 'lexique');
+      
+      // Transformer les données Firebase au format attendu
+      const formattedData = await Promise.all(
+        docs.map(async (doc: any) => {
+          let audioUrl = null;
+          if (doc.audioUrl) {
+            audioUrl = await getStorageUrl(doc.audioUrl);
+          }
+          
+          return {
+            id: doc.id,
+            mot: doc.francais || "",
+            trad: doc.local || "",
+            audio: audioUrl ? { uri: audioUrl } : null,
+          };
+        })
+      );
+      
+      setLexique(formattedData);
+    } catch (error) {
+      console.error("Erreur chargement lexique:", error);
+      // En cas d'erreur, utiliser les données statiques
+      setLexique(STATIC_LEXIQUE);
+>>>>>>> 0d6338c (Préparation du projet a recevoir les données dynamiques depuis la base de données de Firebase)
     } finally {
       setLoading(false);
     }
   };
 
+<<<<<<< HEAD
   // Filtrer les résultats
   const filtered = lexique.filter(
     (item) =>
@@ -152,12 +222,38 @@ export default function LexiquePage() {
             <Text style={styles.retryText}>Réessayer</Text>
           </TouchableOpacity>
         </View>
+=======
+  const filtered = lexique.filter((item) =>
+    item.mot.toLowerCase().includes(search.toLowerCase()) ||
+    item.trad.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const playSound = async (audioFile: any) => {
+    if (!audioFile) return;
+    
+    try {
+      const { sound } = await Audio.Sound.createAsync(audioFile);
+      await sound.playAsync();
+    } catch (error) {
+      console.error("Erreur lecture audio:", error);
+    }
+  };
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <ActivityIndicator size="large" color="#0A84FF" style={{ marginTop: 50 }} />
+        <Text style={{ textAlign: 'center', marginTop: 20, color: '#666' }}>
+          Chargement du lexique...
+        </Text>
+>>>>>>> 0d6338c (Préparation du projet a recevoir les données dynamiques depuis la base de données de Firebase)
       </SafeAreaView>
     );
   }
 
   return (
     <SafeAreaView style={styles.container}>
+<<<<<<< HEAD
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color="#0A84FF" />
@@ -225,11 +321,68 @@ export default function LexiquePage() {
           )}
         />
       )}
+=======
+      <Text style={styles.title}>Lexique de {data?.name}</Text>
+      
+      {/* Indicateur du mode actif */}
+      <Text style={styles.modeIndicator}>
+        Mode: {USE_FIREBASE ? 'Firebase' : 'Statique'}
+      </Text>
+      
+      <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <Text style={styles.backText}>← Retour</Text>
+      </TouchableOpacity>
+
+      <TextInput
+        value={search}
+        onChangeText={setSearch}
+        placeholder="Rechercher un mot..."
+        placeholderTextColor="#aaa"
+        style={styles.search}
+      />
+
+      <FlatList
+        data={filtered}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={{ paddingBottom: 50 }}
+        renderItem={({ item }) => (
+          <View style={styles.row}>
+            <Text style={styles.word}>{item.mot}</Text>
+            <Text style={styles.trans}>{item.trad}</Text>
+
+            <TouchableOpacity 
+              onPress={() => playSound(item.audio)}
+              disabled={!item.audio}
+            >
+              <Ionicons 
+                name="volume-high-outline" 
+                size={26} 
+                color={item.audio ? "#0A84FF" : "#ccc"} 
+              />
+            </TouchableOpacity>
+          </View>
+        )}
+      />
+>>>>>>> 0d6338c (Préparation du projet a recevoir les données dynamiques depuis la base de données de Firebase)
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  modeIndicator: {
+    fontSize: 12,
+    color: "#666",
+    marginBottom: 8,
+    fontStyle: "italic",
+  },
+  backButton: {
+    marginBottom: 16,
+  },
+  backText: {
+    color: "#0A84FF",
+    fontSize: 16,
+  },
+  
   container: {
     padding: 18,
     flex: 1,

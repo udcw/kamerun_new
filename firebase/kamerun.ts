@@ -70,7 +70,7 @@ export type { DocumentData };
  * SWITCH GLOBAL : Active/désactive Firebase
  * true = données Firebase tandis que false = données statiques
  */
-export const USE_FIREBASE = false;
+export const USE_FIREBASE = true;
 
 
 /**

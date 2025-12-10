@@ -1,3 +1,4 @@
+import { USE_FIREBASE, getStorageUrl, getVillageSubcollection } from "@/firebase/kamerun";
 import { Ionicons } from "@expo/vector-icons";
 import { Audio } from "expo-av";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -12,6 +13,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+<<<<<<< HEAD
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -24,6 +26,44 @@ interface Histoire {
   content: string | null;
   image_url: string | null;
   audio_url: string | null;
+=======
+  View
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+
+// Données statiques
+const STATIC_STORIES = [
+  {
+    id: "1",
+    title: "Le roi et le léopard",
+    summary: "Un récit ancien parlant d'un roi dont la bravoure fut testée...",
+    full: `Dans un village reculé vivait un roi dont la bravoure faisait trembler même les esprits de la forêt. 
+Un jour, un léopard sacré apparut près du palais... (texte complet ici)`,
+    image: "https://i.imgur.com/sCEZzQF.jpeg"
+  },
+  {
+    id: "2",
+    title: "L'enfant du tambour",
+    summary: "Une histoire initiatique sur la force de la musique...",
+    full: `On raconte qu'un enfant, né durant la saison des pluies, possédait un don unique : chaque fois qu'il frappait le tambour...`,
+    image: "https://i.imgur.com/Wu35J0h.jpeg"
+  },
+  {
+    id: "3",
+    title: "L'arbre interdit",
+    summary: "Légende expliquant un rite sacré lié aux ancêtres...",
+    full: `Au centre du village se dressait un arbre millénaire. Nul n'avait le droit de le toucher, car on disait qu'il abritait la voix des ancêtres...`,
+    image: "https://i.imgur.com/YkYoJqP.jpeg"
+  }
+];
+
+interface Story {
+  id: string;
+  title: string;
+  summary: string;
+  full: string;
+  image: string;
+>>>>>>> 0d6338c (Préparation du projet a recevoir les données dynamiques depuis la base de données de Firebase)
 }
 
 export default function HistoirePage() {
@@ -34,6 +74,7 @@ export default function HistoirePage() {
     data = JSON.parse(village as string);
   } catch (e) {
     console.warn("⚠️ Paramètre 'village' invalide :", village);
+<<<<<<< HEAD
     data = { id: null, name: "Village inconnu" };
   }
 
@@ -82,11 +123,57 @@ export default function HistoirePage() {
     } catch (err: any) {
       console.error("Erreur chargement histoires:", err);
       setError(err.message || "Erreur lors du chargement des histoires");
+=======
+    data = { name: "Village inconnu", id: "" };
+  }
+
+  const router = useRouter();
+  const [stories, setStories] = useState<Story[]>(STATIC_STORIES);
+  const [loading, setLoading] = useState(false);
+  const [search, setSearch] = useState("");
+  const [selectedStory, setSelectedStory] = useState<Story | null>(null);
+
+  useEffect(() => {
+    if (USE_FIREBASE && data?.id) {
+      loadFirebaseData();
+    } else {
+      setStories(STATIC_STORIES);
+    }
+  }, []);
+
+  const loadFirebaseData = async () => {
+    setLoading(true);
+    try {
+      const docs = await getVillageSubcollection(data?.name?.toLowerCase(), 'histoires');
+      
+      const formattedData = await Promise.all(
+        docs.map(async (doc: any) => {
+          let imageUrl = "";
+          if (doc.imageUrl) {
+            imageUrl = await getStorageUrl(doc.imageUrl);
+          }
+          
+          return {
+            id: doc.id,
+            title: doc.title || "",
+            summary: doc.content ? doc.content.substring(0, 100) + "..." : "",
+            full: doc.content || "",
+            image: imageUrl || "https://placehold.co/600x400/png",
+          };
+        })
+      );
+      
+      setStories(formattedData);
+    } catch (error) {
+      console.error("Erreur chargement histoires:", error);
+      setStories(STATIC_STORIES);
+>>>>>>> 0d6338c (Préparation du projet a recevoir les données dynamiques depuis la base de données de Firebase)
     } finally {
       setLoading(false);
     }
   };
 
+<<<<<<< HEAD
   // Filtrer les résultats
   const filtered = histoires.filter((story) =>
     story.title.toLowerCase().includes(search.toLowerCase())
@@ -177,12 +264,26 @@ export default function HistoirePage() {
             <Text style={styles.retryText}>Réessayer</Text>
           </TouchableOpacity>
         </View>
+=======
+  const filtered = stories.filter(story =>
+    story.title.toLowerCase().includes(search.toLowerCase())
+  );
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <ActivityIndicator size="large" color="#0A84FF" style={{ marginTop: 50 }} />
+        <Text style={{ textAlign: 'center', marginTop: 20, color: '#666' }}>
+          Chargement des histoires...
+        </Text>
+>>>>>>> 0d6338c (Préparation du projet a recevoir les données dynamiques depuis la base de données de Firebase)
       </SafeAreaView>
     );
   }
 
   return (
     <SafeAreaView style={styles.container}>
+<<<<<<< HEAD
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color="#0A84FF" />
@@ -196,6 +297,19 @@ export default function HistoirePage() {
       </Text>
 
       {/* Barre de recherche */}
+=======
+      <Text style={styles.title}>Histoires de {data?.name}</Text>
+      <Text style={styles.subtitle}>Récits, légendes et contes traditionnels</Text>
+      
+      <Text style={styles.modeIndicator}>
+        Mode: {USE_FIREBASE ? 'Firebase' : 'Statique'}
+      </Text>
+      
+      <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <Text style={styles.backText}>← Retour</Text>
+      </TouchableOpacity>
+
+>>>>>>> 0d6338c (Préparation du projet a recevoir les données dynamiques depuis la base de données de Firebase)
       <View style={styles.searchBox}>
         <Ionicons name="search" size={20} color="#666" />
         <TextInput
@@ -352,11 +466,28 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     gap: 10,
   },
+<<<<<<< HEAD
 
   searchInput: {
     flex: 1,
     fontSize: 16,
   },
+=======
+  modeIndicator: {
+    fontSize: 12,
+    color: "#666",
+    marginBottom: 8,
+    fontStyle: "italic",
+  },
+  backButton: {
+    marginBottom: 12,
+  },
+  backText: {
+    color: "#0A84FF",
+    fontSize: 16,
+  },
+  searchInput: { marginLeft: 10, flex: 1, fontSize: 16 },
+>>>>>>> 0d6338c (Préparation du projet a recevoir les données dynamiques depuis la base de données de Firebase)
 
   card: {
     flexDirection: "row",
