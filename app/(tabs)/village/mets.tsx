@@ -237,14 +237,6 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     fontStyle: "italic",
   },
-  // backButton: {
-  //   marginBottom: 12,
-  // },
-  // backText: {
-  //   color: "#0A84FF",
-  //   fontSize: 16,
-  // },
-
   card: {
     flexDirection: "row",
     backgroundColor: "#fff",

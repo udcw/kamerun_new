@@ -33,11 +33,8 @@ export default function AlphabetPage() {
   }
 
   const router = useRouter();
-  // const [alphabetData, setAlphabetData] = useState<AlphabetItem[]>(STATIC_ALPHABET);
-  const [loading, setLoading] = useState(false);
-
-   const [alphabetData, setAlphabetData] = useState<AlphabetEntry[]>([]);
-  // const [loading, setLoading] = useState(true);
+  const [alphabetData, setAlphabetData] = useState<AlphabetEntry[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentSound, setCurrentSound] = useState<Audio.Sound | null>(null);
 
