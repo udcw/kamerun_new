@@ -1,8 +1,4 @@
-<<<<<<< HEAD
 import { Ionicons } from "@expo/vector-icons";
-=======
-import { USE_FIREBASE, getVillageSubcollection } from "@/firebase/kamerun";
->>>>>>> 0d6338c (Préparation du projet a recevoir les données dynamiques depuis la base de données de Firebase)
 import { Audio } from "expo-av";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
@@ -12,7 +8,6 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-<<<<<<< HEAD
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -24,46 +19,6 @@ interface AlphabetEntry {
   french: string;
   local: string;
   audio_url: string | null;
-=======
-  View
-} from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-
-// Données statiques
-const STATIC_ALPHABET = [
-  { fr: "A", local: "A" },
-  { fr: "B", local: "Ɓ" },
-  { fr: "C", local: "Ch" },
-  { fr: "D", local: "D" },
-  { fr: "E", local: "Ɛ" },
-  { fr: "F", local: "F" },
-  { fr: "G", local: "G" },
-  { fr: "H", local: "H" },
-  { fr: "I", local: "I" },
-  { fr: "J", local: "Dz" },
-  { fr: "K", local: "K" },
-  { fr: "L", local: "L" },
-  { fr: "M", local: "M" },
-  { fr: "N", local: "Ŋ" },
-  { fr: "O", local: "Ɔ" },
-  { fr: "P", local: "P" },
-  { fr: "Q", local: "-" },
-  { fr: "R", local: "R" },
-  { fr: "S", local: "S" },
-  { fr: "T", local: "T" },
-  { fr: "U", local: "U" },
-  { fr: "V", local: "V" },
-  { fr: "W", local: "W" },
-  { fr: "X", local: "-" },
-  { fr: "Y", local: "Y" },
-  { fr: "Z", local: "Z" },
-];
-
-interface AlphabetItem {
-  fr: string;
-  local: string;
-  audio?: string | null;
->>>>>>> 0d6338c (Préparation du projet a recevoir les données dynamiques depuis la base de données de Firebase)
 }
 
 export default function AlphabetPage() {
@@ -74,18 +29,10 @@ export default function AlphabetPage() {
     data = JSON.parse(village as string);
   } catch (e) {
     console.warn("⚠️ Paramètre 'village' invalide :", village);
-<<<<<<< HEAD
     data = { id: null, name: "Village inconnu" };
-=======
-    data = { name: "Village inconnu", id: "" };
->>>>>>> 0d6338c (Préparation du projet a recevoir les données dynamiques depuis la base de données de Firebase)
   }
 
   const router = useRouter();
-  const [alphabetData, setAlphabetData] = useState<AlphabetItem[]>(STATIC_ALPHABET);
-  const [loading, setLoading] = useState(false);
-
-<<<<<<< HEAD
   const [alphabetData, setAlphabetData] = useState<AlphabetEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -126,53 +73,11 @@ export default function AlphabetPage() {
     } catch (err: any) {
       console.error("Erreur chargement alphabet:", err);
       setError(err.message || "Erreur lors du chargement de l'alphabet");
-=======
-  // AUDIO STATE
-  const [sound, setSound] = useState<Audio.Sound | null>(null);
-  const [currentAudio, setCurrentAudio] = useState<string | null>(null);
-
-  // Détruit le son quand on quitte la page
-  useEffect(() => {
-    return () => {
-      if (sound) sound.unloadAsync();
-    };
-  }, [sound]);
-
-  useEffect(() => {
-    if (USE_FIREBASE && data?.id) {
-      loadFirebaseData();
-    } else {
-      setAlphabetData(STATIC_ALPHABET);
-    }
-  }, []);
-
-  const loadFirebaseData = async () => {
-    setLoading(true);
-    try {
-      const docs = await getVillageSubcollection(
-        data?.name?.toLowerCase(),
-        "alphabet"
-      );
-
-      const formattedData = docs.map((doc: any) => ({
-        fr: doc.french || "",
-        local: doc.local || "",
-        audio: doc.audioUrl || null,
-      }));
-
-      formattedData.sort((a: { fr: string; }, b: { fr: any; }) => a.fr.localeCompare(b.fr));
-
-      setAlphabetData(formattedData);
-    } catch (error) {
-      console.error("Erreur chargement alphabet:", error);
-      setAlphabetData(STATIC_ALPHABET);
->>>>>>> 0d6338c (Préparation du projet a recevoir les données dynamiques depuis la base de données de Firebase)
     } finally {
       setLoading(false);
     }
   };
 
-<<<<<<< HEAD
   // Lecture audio
   const playSound = async (audioUrl: string | null) => {
     try {
@@ -237,52 +142,12 @@ export default function AlphabetPage() {
             <Text style={styles.retryText}>Réessayer</Text>
           </TouchableOpacity>
         </View>
-=======
-  // PLAY AUDIO
-  const playAudio = async (url: string) => {
-    try {
-      // si déjà en lecture → stop
-      if (sound && currentAudio === url) {
-        await sound.stopAsync();
-        await sound.unloadAsync();
-        setSound(null);
-        setCurrentAudio(null);
-        return;
-      }
-
-      // Stop autre son
-      if (sound) {
-        await sound.stopAsync();
-        await sound.unloadAsync();
-      }
-
-      const { sound: newSound } = await Audio.Sound.createAsync(
-        { uri: url },
-        { shouldPlay: true }
-      );
-
-      setSound(newSound);
-      setCurrentAudio(url);
-    } catch (error) {
-      console.error("Erreur audio:", error);
-    }
-  };
-
-  if (loading) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <ActivityIndicator size="large" color="#0A84FF" style={{ marginTop: 50 }} />
-        <Text style={{ textAlign: "center", marginTop: 20, color: "#666" }}>
-          Chargement de l'alphabet...
-        </Text>
->>>>>>> 0d6338c (Préparation du projet a recevoir les données dynamiques depuis la base de données de Firebase)
       </SafeAreaView>
     );
   }
 
   return (
     <SafeAreaView style={styles.container}>
-<<<<<<< HEAD
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color="#0A84FF" />
@@ -308,45 +173,6 @@ export default function AlphabetPage() {
               {data?.name} — Alphabet
             </Text>
             <View style={{ width: 40 }} />
-=======
-      <Text style={styles.title}>Alphabet de {data?.name}</Text>
-
-      <Text style={styles.modeIndicator}>
-        Mode: {USE_FIREBASE ? "Firebase" : "Statique"}
-      </Text>
-
-      <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-        <Text style={styles.backText}>← Retour</Text>
-      </TouchableOpacity>
-
-      <View style={styles.headerRow}>
-        <Text style={[styles.headerText, { flex: 1 }]}>Français</Text>
-        <Text style={[styles.headerText, { flex: 1 }]}>{data?.name}</Text>
-        <Text style={[styles.headerText, { width: 80 }]}>Audio</Text>
-      </View>
-
-      <FlatList
-        data={alphabetData}
-        keyExtractor={(item) => item.fr}
-        renderItem={({ item }) => (
-          <View style={styles.row}>
-            <Text style={[styles.cell, { flex: 1 }]}>{item.fr}</Text>
-            <Text style={[styles.cell, { flex: 1 }]}>{item.local}</Text>
-
-            {/* 🎧 Bouton audio */}
-            {item.audio ? (
-              <TouchableOpacity
-                onPress={() => playAudio(item.audio!)}
-                style={styles.audioButton}
-              >
-                <Text style={styles.audioText}>
-                  {currentAudio === item.audio ? "⏸" : "🔊"}
-                </Text>
-              </TouchableOpacity>
-            ) : (
-              <Text style={[styles.audioText, { opacity: 0.3 }]}>—</Text>
-            )}
->>>>>>> 0d6338c (Préparation du projet a recevoir les données dynamiques depuis la base de données de Firebase)
           </View>
 
           <FlatList
@@ -414,37 +240,11 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     color: "#222",
   },
-<<<<<<< HEAD
   subtitle: {
     fontSize: 14,
     color: "#666",
     marginBottom: 16,
   },
-=======
-  audioButton: {
-    width: 60,
-    padding: 6,
-    borderRadius: 6,
-    backgroundColor: "#eee",
-    alignItems: "center",
-  },
-  audioText: {
-    fontSize: 20,
-  },
-  modeIndicator: {
-    fontSize: 12,
-    color: "#666",
-    marginBottom: 8,
-    fontStyle: "italic",
-  },
-  backButton: {
-    marginBottom: 16,
-  },
-  backText: {
-    color: "#0A84FF",
-    fontSize: 16,
-  },
->>>>>>> 0d6338c (Préparation du projet a recevoir les données dynamiques depuis la base de données de Firebase)
   headerRow: {
     flexDirection: "row",
     paddingVertical: 10,
