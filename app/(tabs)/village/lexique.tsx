@@ -236,14 +236,6 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     fontStyle: "italic",
   },
-  backButton: {
-    marginBottom: 16,
-  },
-  backText: {
-    color: "#0A84FF",
-    fontSize: 16,
-  },
-  
   container: {
     padding: 18,
     flex: 1,
