@@ -7,12 +7,14 @@ import {
   ImageBackground,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View
 } from 'react-native';
+
 import { supabase } from '../../lib/supabase';
 
 export default function SignUpScreen() {
@@ -252,7 +254,11 @@ export default function SignUpScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardAvoidingView}
       >
-        <View style={styles.scrollContainer}>
+       <ScrollView
+  contentContainerStyle={styles.scrollContainer}
+  keyboardShouldPersistTaps="handled"
+  showsVerticalScrollIndicator={false}
+>
           <View style={styles.container}>
             <Text style={styles.title}>Inscription</Text>
             <Text style={styles.subtitle}>Rejoignez la communauté Kamerun News</Text>
@@ -404,7 +410,7 @@ export default function SignUpScreen() {
               </Text>
             </View>
           </View>
-        </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </ImageBackground>
   );
@@ -413,11 +419,13 @@ export default function SignUpScreen() {
 const styles = StyleSheet.create({
   background: { flex: 1 },
   keyboardAvoidingView: { flex: 1 },
-  scrollContainer: { 
-    flex: 1,
-    justifyContent: 'center',
-    paddingVertical: 20,
-  },
+scrollContainer: { 
+ flexGrow: 1,
+  justifyContent: 'flex-start',
+  paddingVertical: 70,
+  // paddingBottom: 10, // espace pour le bouton
+  // paddingHorizontal: 10,
+},
   container: {
     backgroundColor: 'rgba(255, 255, 240, 0.95)',
     marginHorizontal: 20,

@@ -16,15 +16,16 @@ import {
   Dimensions,
   FlatList,
   ImageBackground,
+  Linking,
   Modal,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
-} from "react-native";
-import { db } from "../../firebase/kamerun";
+  View
+} from 'react-native';
+import { auth, db } from '../../firebase/kamerun';
 
 // Configuration du backend
 const BACKEND_URL = "https://severbackendnotchpay.onrender.com"; // Remplacez par votre URL de production
@@ -220,36 +221,16 @@ export default function HomeScreen() {
     fetchUserData();
   }, []);
 
-  const handleBackendPayment = () => {
-    if (!user && !userData) {
-      Alert.alert(
-        "Connexion requise",
-        "Veuillez vous connecter pour accéder au contenu premium",
-        [
-          {
-            text: "Annuler",
-            style: "cancel",
-          },
-          {
-            text: "Se connecter",
-            onPress: () => router.push("/login"),
-          },
-        ]
-      );
-      return;
-    }
+const handleBackendPayment = async () => {
 
-    if (!backendAvailable) {
-      Alert.alert(
-        "Service indisponible",
-        "Le service de paiement est temporairement indisponible. Veuillez réessayer plus tard.",
-        [{ text: "OK" }]
-      );
-      return;
-    }
+  if (!backendAvailable) {
+    Alert.alert("Service indisponible", "Le service de paiement est temporairement indisponible.");
+    return;
+  }
 
-    setShowPaymentModal(true);
-  };
+  setShowPaymentModal(true);
+};
+
 
   const processBackendPayment = async (method: string) => {
     if (!backendAvailable) {
