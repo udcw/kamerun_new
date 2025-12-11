@@ -1,24 +1,24 @@
 // @ts-ignore
-import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
-import { 
-  FlatList, 
-  ImageBackground, 
-  ScrollView, 
-  StyleSheet, 
-  Text, 
-  TouchableOpacity, 
-  View, 
-  Dimensions, 
-  Alert, 
-  ActivityIndicator,
-  Modal,
-  TextInput,
-  Linking 
-} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { auth, db } from '../../firebase/kamerun';
+import { useRouter } from 'expo-router';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import React, { useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  FlatList,
+  ImageBackground,
+  Linking,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
+} from 'react-native';
+import { auth, db } from '../../firebase/kamerun';
 
 // Configuration du backend
 const BACKEND_URL = 'https://severbackendnotchpay.onrender.com'; // Remplacez par votre URL de production
@@ -178,56 +178,130 @@ export default function HomeScreen() {
     checkBackend();
   }, []);
 
+  // useEffect(() => {
+  //   const unsubscribe = auth.onAuthStateChanged(async (user) => {
+  //     setUser(user);
+  //     if (user) {
+  //       const userDoc = await getDoc(doc(db, 'users', user.uid));
+  //       if (userDoc.exists()) {
+  //         const data = userDoc.data();
+  //         setUserData(data);
+  //         setIsPremium(data.isPremium || false);
+  //         setPhoneNumber(data.phone || '');
+  //       }
+  //     } else {
+  //       setIsPremium(false);
+  //       setUserData(null);
+  //     }
+  //     setLoading(false);
+  //   });
+  //   return unsubscribe;
+  // }, []);
+
+
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged(async (user) => {
-      setUser(user);
-      if (user) {
-        const userDoc = await getDoc(doc(db, 'users', user.uid));
-        if (userDoc.exists()) {
-          const data = userDoc.data();
-          setUserData(data);
-          setIsPremium(data.isPremium || false);
-          setPhoneNumber(data.phone || '');
-        }
-      } else {
-        setIsPremium(false);
-        setUserData(null);
+  const unsubscribe = auth.onAuthStateChanged(async (currentUser) => {
+    if (currentUser) {
+      setUser(currentUser);
+      const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
+      if (userDoc.exists()) {
+        const data = userDoc.data();
+        setUserData(data);
+        setIsPremium(data.isPremium || false);
+        setPhoneNumber(data.phone || '');
       }
-      setLoading(false);
-    });
-    return unsubscribe;
-  }, []);
-
-  const handleBackendPayment = () => {
-    if (!user) {
-      Alert.alert(
-        "Connexion requise",
-        "Veuillez vous connecter pour accéder au contenu premium",
-        [
-          {
-            text: "Annuler",
-            style: "cancel"
-          },
-          { 
-            text: "Se connecter", 
-            onPress: () => router.push('/login')
-          }
-        ]
-      );
-      return;
+    } else {
+      setUser(null);
+      setUserData(null);
+      setIsPremium(false);
     }
+    setLoading(false);
+  });
 
-    if (!backendAvailable) {
-      Alert.alert(
-        "Service indisponible",
-        "Le service de paiement est temporairement indisponible. Veuillez réessayer plus tard.",
-        [{ text: "OK" }]
-      );
-      return;
-    }
+  return unsubscribe;
+}, []);
 
-    setShowPaymentModal(true);
-  };
+  // const handleBackendPayment = () => {
+  //   if (!user) {
+  //     Alert.alert(
+  //       "Connexion requise",
+  //       "Veuillez vous connecter pour accéder au contenu premium",
+  //       [
+  //         {
+  //           text: "Annuler",
+  //           style: "cancel"
+  //         },
+  //         { 
+  //           text: "Se connecter", 
+  //           onPress: () => router.push('/login')
+  //         }
+  //       ]
+  //     );
+  //     return;
+  //   }
+
+  //   if (!backendAvailable) {
+  //     Alert.alert(
+  //       "Service indisponible",
+  //       "Le service de paiement est temporairement indisponible. Veuillez réessayer plus tard.",
+  //       [{ text: "OK" }]
+  //     );
+  //     return;
+  //   }
+
+  //   setShowPaymentModal(true);
+  // };
+
+//   const handleBackendPayment = () => {
+//   if (!backendAvailable) {
+//     Alert.alert(
+//       "Service indisponible",
+//       "Le service de paiement est temporairement indisponible. Veuillez réessayer plus tard.",
+//       [{ text: "OK" }]
+//     );
+//     return;
+//   }
+
+//   setShowPaymentModal(true);
+// };
+
+
+// const ensureUser = async () => {
+//   if (!user) {
+//     const currentUser = auth.currentUser;
+//     if (currentUser) {
+//       setUser(currentUser);
+//       const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
+//       if (userDoc.exists()) {
+//         const data = userDoc.data();
+//         setUserData(data);
+//         // setIsPremium(data.isPremium || false);
+//         setPhoneNumber(data.phone || '');
+//       }
+//     } else {
+//       Alert.alert(
+//         "Connexion requise",
+//         "Veuillez vous connecter pour accéder au contenu premium",
+//         [{ text: "OK" }]
+//       );
+//       return false;
+//     }
+//   }
+//   return true;
+// };
+
+const handleBackendPayment = async () => {
+  //  const userReady = await ensureUser();
+  //  if (!userReady) return;
+
+  if (!backendAvailable) {
+    Alert.alert("Service indisponible", "Le service de paiement est temporairement indisponible.");
+    return;
+  }
+
+  setShowPaymentModal(true);
+};
+
 
   const processBackendPayment = async (method: string) => {
     if (!backendAvailable) {
@@ -325,45 +399,104 @@ export default function HomeScreen() {
     }
   };
 
-  const startBackendPaymentStatusCheck = async (transactionId: string) => {
-    let attempts = 0;
-    const maxAttempts = 60; // 60 tentatives sur 5 minutes
+  // const startBackendPaymentStatusCheck = async (transactionId: string) => {
+  //   let attempts = 0;
+  //   const maxAttempts = 60; // 60 tentatives sur 5 minutes
     
-    const checkStatus = async () => {
-      attempts++;
-      const status = await PaymentService.verifyPayment(transactionId);
+  //   const checkStatus = async () => {
+  //     attempts++;
+  //     const status = await PaymentService.verifyPayment(transactionId);
       
-      if (status.paid) {
-        // Paiement réussi - mettre à jour le statut premium dans Firebase
-        try {
-          if (user) {
-            await updateDoc(doc(db, 'users', user.uid), {
-              isPremium: true,
-              premiumActivatedAt: new Date(),
-              lastPaymentDate: new Date()
-            });
+  //     if (status.paid) {
+  //       // Paiement réussi - mettre à jour le statut premium dans Firebase
+  //       try {
+  //         if (user) {
+  //           await updateDoc(doc(db, 'users', user.uid), {
+  //             isPremium: true,
+  //             premiumActivatedAt: new Date(),
+  //             lastPaymentDate: new Date()
+  //           });
             
-            Alert.alert('Succès', 'Paiement confirmé! Accès premium activé.');
-            setIsPremium(true);
-            setCurrentTransaction('');
-            router.push('/cultures-premium');
-          }
-        } catch (error) {
-          console.error('Erreur mise à jour statut premium:', error);
-          Alert.alert('Succès', 'Paiement confirmé! Redirection...');
-          setIsPremium(true);
+  //           Alert.alert('Succès', 'Paiement confirmé! Accès premium activé.');
+  //           setIsPremium(true);
+  //           setCurrentTransaction('');
+  //           router.push('/cultures-premium');
+  //         }
+  //       } catch (error) {
+  //         console.error('Erreur mise à jour statut premium:', error);
+  //         Alert.alert('Succès', 'Paiement confirmé! Redirection...');
+  //         setIsPremium(true);
+  //         setCurrentTransaction('');
+  //         router.push('/cultures-premium');
+  //       }
+  //       return;
+  //     }
+      
+  //     if (status.status === 'failed' || status.status === 'canceled') {
+  //       Alert.alert('Échec', 'Le paiement a échoué ou a été annulé.');
+  //       setCurrentTransaction('');
+  //       return;
+  //     }
+      
+  //     if (attempts < maxAttempts) {
+  //       // Continuer à vérifier toutes les 5 secondes
+  //       setTimeout(checkStatus, 5000);
+  //     } else {
+  //       Alert.alert(
+  //         'Délai dépassé',
+  //         'Le paiement n\'a pas été confirmé dans le délai imparti. Vous serez notifié lorsque le paiement sera traité.',
+  //         [{ 
+  //           text: 'OK',
+  //           onPress: () => setCurrentTransaction('')
+  //         }]
+  //       );
+  //     }
+  //   };
+    
+  //   checkStatus();
+  // };
+
+
+  const startBackendPaymentStatusCheck = async (transactionId: string) => {
+  let attempts = 0;
+  const maxAttempts = 60; // 60 tentatives sur 5 minutes
+
+  const checkStatus = async () => {
+    attempts++;
+
+    try {
+      const status = await PaymentService.verifyPayment(transactionId);
+
+      if (status.paid) {
+        // Récupérer l'utilisateur Firebase directement
+        const currentUser = auth.currentUser;
+        if (!currentUser) {
+          Alert.alert('Erreur', 'Utilisateur non connecté. Veuillez vous reconnecter.');
           setCurrentTransaction('');
-          router.push('/cultures-premium');
+          return;
         }
+
+        // Paiement réussi - mettre à jour le statut premium dans Firebase
+        await updateDoc(doc(db, 'users', currentUser.uid), {
+          isPremium: true,
+          premiumActivatedAt: new Date(),
+          lastPaymentDate: new Date(),
+        });
+
+        // Mettre à jour l'état local et rediriger
+        setIsPremium(true);
+        setCurrentTransaction('');
+        Alert.alert('Succès', 'Paiement confirmé! Accès premium activé.');
+        router.push('/cultures-premium');
         return;
       }
-      
+
       if (status.status === 'failed' || status.status === 'canceled') {
         Alert.alert('Échec', 'Le paiement a échoué ou a été annulé.');
         setCurrentTransaction('');
         return;
       }
-      
+
       if (attempts < maxAttempts) {
         // Continuer à vérifier toutes les 5 secondes
         setTimeout(checkStatus, 5000);
@@ -371,16 +504,22 @@ export default function HomeScreen() {
         Alert.alert(
           'Délai dépassé',
           'Le paiement n\'a pas été confirmé dans le délai imparti. Vous serez notifié lorsque le paiement sera traité.',
-          [{ 
-            text: 'OK',
-            onPress: () => setCurrentTransaction('')
-          }]
+          [{ text: 'OK', onPress: () => setCurrentTransaction('') }]
         );
       }
-    };
-    
-    checkStatus();
+    } catch (error) {
+      console.error('Erreur vérification paiement:', error);
+      if (attempts < maxAttempts) {
+        setTimeout(checkStatus, 5000);
+      } else {
+        Alert.alert('Erreur', 'Impossible de vérifier le paiement. Veuillez réessayer plus tard.');
+        setCurrentTransaction('');
+      }
+    }
   };
+
+  checkStatus();
+};
 
   const renderItem = ({ item }: { item: { id: string; title: string; description: string; category: string; date: string } }) => {
     return (

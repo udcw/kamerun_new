@@ -2,7 +2,6 @@ import { createDrawerNavigator, DrawerContentScrollView, DrawerItem, DrawerItemL
 import React, { useEffect, useState } from 'react';
 import { Alert, Text, View } from 'react-native';
 import { supabase } from '../../lib/supabase';
-import ProfileScreen from './explore';
 import HomeScreen from './home';
 import SettingsScreen from './ProfileScreen';
 
@@ -91,8 +90,8 @@ export default function AppDrawer({ navigation }: any) {
           ),
         }}
       />
-      <Drawer.Screen name="Profile" component={ProfileScreen} />
-      <Drawer.Screen name="Settings" component={SettingsScreen} />
+      <Drawer.Screen name="Profile" component={SettingsScreen} />
+      {/* <Drawer.Screen name="Settings" component={SettingsScreen} /> */}
     </Drawer.Navigator>
   );
 }
