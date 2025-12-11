@@ -1,17 +1,17 @@
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
+  Alert,
   Image,
+  RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
-  ScrollView,
-  Alert,
-  RefreshControl
+  View
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
-import { useRouter } from 'expo-router';
 
 export default function ProfileScreen() {
   const [userData, setUserData] = useState<any>(null);
