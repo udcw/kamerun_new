@@ -234,12 +234,25 @@ function generateTrid(length: number): string {
   return result.toUpperCase();
 }
 
+function getErrorMessage(errorCode: number): string {
+  switch (errorCode) {
+    case 703202:
+      return "Le paiement a été rejecté";
+    case 703108:
+      return "Votre balance est insuffisante pour éffectuer ce paiement";
+    case 703201:
+      return "Le paiement n'a pas été confirmé";
+    default:
+      return "Le paiement a échoué";
+  }
+}
+
 export {
   checkAvailibitity,
   getPaymentInfo,
   getPaymentItemId,
   initPayment,
   initQuote,
-  makePayment
+  makePayment,
+  getErrorMessage,
 };
-

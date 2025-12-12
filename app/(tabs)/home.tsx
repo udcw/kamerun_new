@@ -2,13 +2,13 @@
 import { supabase } from "@/lib/supabase";
 import {
   checkAvailibitity,
+  getErrorMessage,
   getPaymentInfo,
   makePayment,
 } from "@/services/maviance/services";
 import { Ionicons } from "@expo/vector-icons";
 import { User } from "@supabase/supabase-js";
 import { useRouter } from "expo-router";
-import { doc, getDoc } from "firebase/firestore";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -16,101 +16,20 @@ import {
   Dimensions,
   FlatList,
   ImageBackground,
-  Linking,
   Modal,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View
-} from 'react-native';
-import { auth, db } from '../../firebase/kamerun';
-
-// Configuration du backend
-const BACKEND_URL = "https://severbackendnotchpay.onrender.com"; // Remplacez par votre URL de production
+  View,
+} from "react-native";
 
 // Méthodes de paiement supportées
 const PAYMENT_METHODS = [
   { id: "mtn", name: "MTN Mobile Money", icon: "📱" },
   { id: "orange", name: "Orange Money", icon: "🍊" },
 ];
-
-// Service pour interagir avec le backend
-class PaymentService {
-  static async checkBackendHealth(): Promise<boolean> {
-    try {
-      const response = await fetch(`${BACKEND_URL}/`);
-      return response.ok;
-    } catch (error) {
-      console.error("Erreur vérification backend:", error);
-      return false;
-    }
-  }
-
-  static async initiatePayment(
-    amount: number,
-    phone: string,
-    method: string,
-    userId: string,
-    email?: string,
-    name?: string
-  ) {
-    try {
-      const response = await fetch(`${BACKEND_URL}/payments/initiate`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email: email || "user@example.com",
-          amount: amount,
-          name: name || "Utilisateur",
-          phone: phone,
-          description: "Abonnement Premium Kamerun News",
-        }),
-      });
-
-      const data = await response.json();
-      return data;
-    } catch (error) {
-      console.error("Erreur initiation paiement:", error);
-      throw error;
-    }
-  }
-
-  static async verifyPayment(reference: string) {
-    try {
-      const response = await fetch(
-        `${BACKEND_URL}/payments/verify/${reference}`
-      );
-      const data = await response.json();
-
-      return {
-        paid: data.status === "complete",
-        status: data.status,
-        transaction: data.transaction,
-      };
-    } catch (error) {
-      console.error("Erreur vérification paiement:", error);
-      throw error;
-    }
-  }
-
-  static async getUserPremiumStatus(userId: string) {
-    try {
-      const userDoc = await getDoc(doc(db, "users", userId));
-      if (userDoc.exists()) {
-        const data = userDoc.data();
-        return { isPremium: data.isPremium || false };
-      }
-      return { isPremium: false };
-    } catch (error) {
-      console.error("Erreur statut premium:", error);
-      return { isPremium: false };
-    }
-  }
-}
 
 // Validation du numéro de téléphone
 const validatePhoneNumber = (phone: string, method: string) => {
@@ -182,7 +101,6 @@ export default function HomeScreen() {
   const [showPaymentModal, setShowPaymentModal] = useState<boolean>(false);
   const [selectedMethod, setSelectedMethod] = useState<string>("");
   const [phoneNumber, setPhoneNumber] = useState<string>("");
-  const [currentTransaction, setCurrentTransaction] = useState<string>("");
   const [backendAvailable, setBackendAvailable] = useState<boolean>(true);
 
   // Vérifier la disponibilité du backend au chargement
@@ -221,16 +139,17 @@ export default function HomeScreen() {
     fetchUserData();
   }, []);
 
-const handleBackendPayment = async () => {
+  const handleBackendPayment = async () => {
+    if (!backendAvailable) {
+      Alert.alert(
+        "Service indisponible",
+        "Le service de paiement est temporairement indisponible."
+      );
+      return;
+    }
 
-  if (!backendAvailable) {
-    Alert.alert("Service indisponible", "Le service de paiement est temporairement indisponible.");
-    return;
-  }
-
-  setShowPaymentModal(true);
-};
-
+    setShowPaymentModal(true);
+  };
 
   const processBackendPayment = async (method: string) => {
     if (!backendAvailable) {
@@ -290,11 +209,13 @@ const handleBackendPayment = async () => {
     const maxAttempts = 60; // 60 tentatives sur 5 minutes
     const interval = setInterval(async () => {
       const paymentInfo = await getPaymentInfo(ptn);
+      console.log(paymentInfo.responseData);
 
       const paymentArray = paymentInfo.responseData as unknown as Array<
         Record<string, unknown>
       >;
       const status = paymentArray[0]?.status as string;
+      const errorCode = paymentArray[0]?.errorCode as number;
       console.log("Payment status:", status);
 
       if (status != "PENDING") {
@@ -313,7 +234,7 @@ const handleBackendPayment = async () => {
           setIsPremium(true);
           router.push("/cultures-premium");
         } else {
-          Alert.alert("Error", "Paiement non validé!");
+          Alert.alert("Error", getErrorMessage(errorCode));
         }
         clearInterval(interval);
       }
@@ -327,7 +248,7 @@ const handleBackendPayment = async () => {
           [
             {
               text: "OK",
-              onPress: () => setCurrentTransaction(""),
+              onPress: () => {},
             },
           ]
         );
