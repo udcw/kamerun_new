@@ -244,16 +244,16 @@ const styles = StyleSheet.create({
   header: {
     marginBottom: 10,
   },
-  // backButton: {
-  //   flexDirection: "row",
-  //   alignItems: "center",
-  //   gap: 6,
-  // },
-  // backText: {
-  //   fontSize: 16,
-  //   color: "#0A84FF",
-  //   fontWeight: "600",
-  // },
+  backButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  backText: {
+    fontSize: 16,
+    color: "#0A84FF",
+    fontWeight: "600",
+  },
   title: {
     fontSize: 26,
     fontWeight: "700",

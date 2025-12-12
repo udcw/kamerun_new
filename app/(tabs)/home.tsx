@@ -208,7 +208,7 @@ export default function HomeScreen() {
         .eq("id", user.id)
         .single();
       setUserData(profile);
-      setIsPremium(profile.isPremium || false);
+      setIsPremium(profile.is_premium || false);
       setPhoneNumber(profile.phone || "");
     } else {
       setIsPremium(false);
