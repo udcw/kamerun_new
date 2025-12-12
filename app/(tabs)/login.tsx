@@ -1,6 +1,6 @@
-import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
+import React, { useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -13,12 +13,12 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-} from 'react-native';
-import { supabase } from '../../lib/supabase';
+} from "react-native";
+import { supabase } from "../../lib/supabase";
 
 export default function LoginScreen() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -29,50 +29,51 @@ export default function LoginScreen() {
       Alert.alert("Erreur", "Veuillez remplir tous les champs.");
       return;
     }
-  
+
     setLoading(true);
-  
+
     try {
       // 1) Login
-      const { data: auth, error: authError } = await supabase.auth.signInWithPassword({
-        email: email.trim().toLowerCase(),
-        password,
-      });
-  
+      const { data: userAuth, error: authError } =
+        await supabase.auth.signInWithPassword({
+          email: email.trim().toLowerCase(),
+          password,
+        });
+
       if (authError) throw authError;
-  
-      const user = auth.user;
+
+      const user = userAuth.user;
       if (!user) {
         throw new Error("Utilisateur introuvable après connexion.");
       }
-  
+
       // 2) Charger le profil
       const { data: profile, error: profileError } = await supabase
         .from("profiles")
         .select("*")
         .eq("id", user.id)
         .single();
-  
+
       if (profileError) throw profileError;
-  
+
       console.log("Profil utilisateur:", profile);
-  
+
       // 3) Redirection
       router.replace("/(tabs)/AppDrawer");
-  
     } catch (err: any) {
       console.error("Erreur login:", err);
-  
+
       const errorMap: Record<string, string> = {
         "Invalid login credentials": "Email ou mot de passe incorrect.",
-        "Email not confirmed": "Veuillez vérifier votre email avant de vous connecter.",
+        "Email not confirmed":
+          "Veuillez vérifier votre email avant de vous connecter.",
       };
-  
+
       const message =
         errorMap[err.message] ?? "Une erreur est survenue. Réessayez.";
-  
+
       Alert.alert("Erreur", message);
-      Alert.alert('Erreur', 'Veuillez remplir tous les champs.');
+      Alert.alert("Erreur", "Veuillez remplir tous les champs.");
       return;
     }
 
@@ -91,43 +92,42 @@ export default function LoginScreen() {
       if (data.user) {
         // Récupération des infos utilisateur depuis la table profiles
         const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', data.user.id)
+          .from("profiles")
+          .select("*")
+          .eq("id", data.user.id)
           .single();
 
         if (profileError) {
-          console.log('Erreur profil:', profileError);
+          console.log("Erreur profil:", profileError);
         } else {
-          console.log('Infos utilisateur:', profile);
+          console.log("Infos utilisateur:", profile);
         }
 
-        Alert.alert('Succès', 'Connexion réussie !');
-        router.replace('/(tabs)/AppDrawer');
+        Alert.alert("Succès", "Connexion réussie !");
+        router.replace("/(tabs)/AppDrawer");
       }
     } catch (error: any) {
-      console.error('Erreur connexion:', error);
-      let errorMessage = 'Une erreur est survenue';
-      
-      if (error.message.includes('Invalid login credentials')) {
-        errorMessage = 'Email ou mot de passe incorrect';
+      console.error("Erreur connexion:", error);
+      let errorMessage = "Une erreur est survenue";
+
+      if (error.message.includes("Invalid login credentials")) {
+        errorMessage = "Email ou mot de passe incorrect";
       }
-      
-      Alert.alert('Erreur', errorMessage);
+
+      Alert.alert("Erreur", errorMessage);
     } finally {
       setLoading(false);
     }
   };
-  
 
   return (
     <ImageBackground
-      source={require('@/assets/images/a.jpg')}
+      source={require("@/assets/images/a.jpg")}
       style={styles.background}
       resizeMode="cover"
     >
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={{ flex: 1 }}
       >
         <ScrollView contentContainerStyle={styles.scrollContainer}>
@@ -142,7 +142,7 @@ export default function LoginScreen() {
               keyboardType="email-address"
               autoCapitalize="none"
             />
-            
+
             <View style={styles.passwordContainer}>
               <TextInput
                 placeholder="Mot de passe"
@@ -154,7 +154,7 @@ export default function LoginScreen() {
               />
               <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
                 <Ionicons
-                  name={showPassword ? 'eye' : 'eye-off'}
+                  name={showPassword ? "eye" : "eye-off"}
                   size={24}
                   color="#8B0000"
                 />
@@ -162,7 +162,7 @@ export default function LoginScreen() {
             </View>
 
             <TouchableOpacity
-              style={[styles.button, loading && { backgroundColor: '#aaa' }]}
+              style={[styles.button, loading && { backgroundColor: "#aaa" }]}
               onPress={handleLogin}
               disabled={loading}
             >
@@ -174,10 +174,10 @@ export default function LoginScreen() {
             </TouchableOpacity>
 
             <Text style={styles.link}>
-              Pas encore de compte ?{' '}
+              Pas encore de compte ?{" "}
               <Text
                 style={styles.linkHighlight}
-                onPress={() => router.push('/inscription')}
+                onPress={() => router.push("/inscription")}
               >
                 S'inscrire
               </Text>
@@ -194,63 +194,63 @@ const styles = StyleSheet.create({
   scrollContainer: { flexGrow: 1 },
   container: {
     flex: 1,
-    backgroundColor: 'rgba(255, 255, 240, 0.85)',
+    backgroundColor: "rgba(255, 255, 240, 0.85)",
     margin: 20,
     borderRadius: 15,
     padding: 20,
-    justifyContent: 'center',
+    justifyContent: "center",
   },
   title: {
     fontSize: 28,
-    fontWeight: '700',
+    fontWeight: "700",
     marginBottom: 25,
-    color: '#8B0000',
-    textAlign: 'center',
+    color: "#8B0000",
+    textAlign: "center",
   },
   input: {
     borderWidth: 1,
-    borderColor: '#8B0000',
+    borderColor: "#8B0000",
     borderRadius: 10,
     paddingHorizontal: 15,
     height: 50,
     marginBottom: 15,
-    backgroundColor: '#FFF8DC',
+    backgroundColor: "#FFF8DC",
   },
   passwordContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     borderWidth: 1,
-    borderColor: '#8B0000',
+    borderColor: "#8B0000",
     borderRadius: 10,
     paddingHorizontal: 15,
     height: 50,
     marginBottom: 15,
-    backgroundColor: '#FFF8DC',
+    backgroundColor: "#FFF8DC",
   },
   passwordInput: {
     flex: 1,
-    height: '100%',
+    height: "100%",
   },
   button: {
-    backgroundColor: '#FF8C00',
+    backgroundColor: "#FF8C00",
     paddingVertical: 15,
     borderRadius: 10,
-    alignItems: 'center',
+    alignItems: "center",
     marginTop: 5,
   },
   buttonText: {
-    color: '#FFF',
-    fontWeight: '600',
+    color: "#FFF",
+    fontWeight: "600",
     fontSize: 16,
   },
   link: {
     marginTop: 15,
-    textAlign: 'center',
+    textAlign: "center",
     fontSize: 14,
-    color: '#4B0082',
+    color: "#4B0082",
   },
   linkHighlight: {
-    fontWeight: '700',
-    color: '#8B0000',
+    fontWeight: "700",
+    color: "#8B0000",
   },
 });

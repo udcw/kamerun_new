@@ -1,8 +1,15 @@
 // @ts-ignore
-import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
-import React, { useEffect, useState } from 'react';
+import { supabase } from "@/lib/supabase";
+import {
+  checkAvailibitity,
+  getPaymentInfo,
+  makePayment,
+} from "@/services/maviance/services";
+import { Ionicons } from "@expo/vector-icons";
+import { User } from "@supabase/supabase-js";
+import { useRouter } from "expo-router";
+import { doc, getDoc } from "firebase/firestore";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -21,12 +28,12 @@ import {
 import { auth, db } from '../../firebase/kamerun';
 
 // Configuration du backend
-const BACKEND_URL = 'https://severbackendnotchpay.onrender.com'; // Remplacez par votre URL de production
+const BACKEND_URL = "https://severbackendnotchpay.onrender.com"; // Remplacez par votre URL de production
 
 // Méthodes de paiement supportées
 const PAYMENT_METHODS = [
-  { id: 'mtn', name: 'MTN Mobile Money', icon: '📱' },
-  { id: 'orange', name: 'Orange Money', icon: '🍊' },
+  { id: "mtn", name: "MTN Mobile Money", icon: "📱" },
+  { id: "orange", name: "Orange Money", icon: "🍊" },
 ];
 
 // Service pour interagir avec le backend
@@ -36,7 +43,7 @@ class PaymentService {
       const response = await fetch(`${BACKEND_URL}/`);
       return response.ok;
     } catch (error) {
-      console.error('Erreur vérification backend:', error);
+      console.error("Erreur vérification backend:", error);
       return false;
     }
   }
@@ -51,53 +58,55 @@ class PaymentService {
   ) {
     try {
       const response = await fetch(`${BACKEND_URL}/payments/initiate`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          email: email || 'user@example.com',
+          email: email || "user@example.com",
           amount: amount,
-          name: name || 'Utilisateur',
+          name: name || "Utilisateur",
           phone: phone,
-          description: 'Abonnement Premium Kamerun News'
+          description: "Abonnement Premium Kamerun News",
         }),
       });
 
       const data = await response.json();
       return data;
     } catch (error) {
-      console.error('Erreur initiation paiement:', error);
+      console.error("Erreur initiation paiement:", error);
       throw error;
     }
   }
 
   static async verifyPayment(reference: string) {
     try {
-      const response = await fetch(`${BACKEND_URL}/payments/verify/${reference}`);
+      const response = await fetch(
+        `${BACKEND_URL}/payments/verify/${reference}`
+      );
       const data = await response.json();
-      
+
       return {
-        paid: data.status === 'complete',
+        paid: data.status === "complete",
         status: data.status,
-        transaction: data.transaction
+        transaction: data.transaction,
       };
     } catch (error) {
-      console.error('Erreur vérification paiement:', error);
+      console.error("Erreur vérification paiement:", error);
       throw error;
     }
   }
 
   static async getUserPremiumStatus(userId: string) {
     try {
-      const userDoc = await getDoc(doc(db, 'users', userId));
+      const userDoc = await getDoc(doc(db, "users", userId));
       if (userDoc.exists()) {
         const data = userDoc.data();
         return { isPremium: data.isPremium || false };
       }
       return { isPremium: false };
     } catch (error) {
-      console.error('Erreur statut premium:', error);
+      console.error("Erreur statut premium:", error);
       return { isPremium: false };
     }
   }
@@ -105,51 +114,59 @@ class PaymentService {
 
 // Validation du numéro de téléphone
 const validatePhoneNumber = (phone: string, method: string) => {
-  const cleaned = phone.replace(/\D/g, '');
+  const cleaned = phone.replace(/\D/g, "");
 
   if (cleaned.length < 9) {
-    return { isValid: false, message: 'Le numéro doit avoir au moins 9 chiffres' };
+    return {
+      isValid: false,
+      message: "Le numéro doit avoir au moins 9 chiffres",
+    };
   }
 
-  if (method === 'mtn') {
-    if (!cleaned.startsWith('6')) {
-      return { isValid: false, message: 'Le numéro MTN doit commencer par 6' };
+  if (method === "mtn") {
+    if (!cleaned.startsWith("6")) {
+      return { isValid: false, message: "Le numéro MTN doit commencer par 6" };
     }
-  } else if (method === 'orange') {
-    if (!cleaned.startsWith('6') && !cleaned.startsWith('7')) {
-      return { isValid: false, message: 'Le numéro Orange doit commencer par 6 ou 7' };
+  } else if (method === "orange") {
+    if (!cleaned.startsWith("6") && !cleaned.startsWith("7")) {
+      return {
+        isValid: false,
+        message: "Le numéro Orange doit commencer par 6 ou 7",
+      };
     }
   }
 
-  return { isValid: true, message: '' };
+  return { isValid: true, message: "" };
 };
 
 const newsData = [
   {
-    id: '1',
+    id: "1",
     title: "Nouvelle découverte dans le village Baka",
-    description: "Les Baka du sud-est célèbrent un festival culturel exceptionnel...",
+    description:
+      "Les Baka du sud-est célèbrent un festival culturel exceptionnel...",
     category: "Culture",
     date: "Il y a 2h",
   },
   {
-    id: '2',
+    id: "2",
     title: "Festival des danses traditionnelles à l'Ouest",
     description: "La région de l'Ouest accueille des centaines de visiteurs...",
     category: "Événement",
     date: "Il y a 5h",
   },
   {
-    id: '3',
+    id: "3",
     title: "Les traditions culinaires des tribus du Nord",
     description: "Découvrez les plats typiques et leur histoire...",
     category: "Gastronomie",
     date: "Hier",
   },
   {
-    id: '4',
+    id: "4",
     title: "Cérémonie d'initiation chez les Bamiléké",
-    description: "Une cérémonie ancestrale préservée à travers les générations...",
+    description:
+      "Une cérémonie ancestrale préservée à travers les générations...",
     category: "Tradition",
     date: "Il y a 3 jours",
   },
@@ -157,142 +174,54 @@ const newsData = [
 
 export default function HomeScreen() {
   const router = useRouter();
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [userData, setUserData] = useState<any>(null);
   const [isPremium, setIsPremium] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
   const [processingPayment, setProcessingPayment] = useState<boolean>(false);
   const [showPaymentModal, setShowPaymentModal] = useState<boolean>(false);
-  const [selectedMethod, setSelectedMethod] = useState<string>('');
-  const [phoneNumber, setPhoneNumber] = useState<string>('');
-  const [currentTransaction, setCurrentTransaction] = useState<string>('');
+  const [selectedMethod, setSelectedMethod] = useState<string>("");
+  const [phoneNumber, setPhoneNumber] = useState<string>("");
+  const [currentTransaction, setCurrentTransaction] = useState<string>("");
   const [backendAvailable, setBackendAvailable] = useState<boolean>(true);
 
   // Vérifier la disponibilité du backend au chargement
   useEffect(() => {
     const checkBackend = async () => {
-      const isAvailable = await PaymentService.checkBackendHealth();
+      const isAvailable = await checkAvailibitity();
       setBackendAvailable(isAvailable);
     };
-    
+
     checkBackend();
   }, []);
 
-  // useEffect(() => {
-  //   const unsubscribe = auth.onAuthStateChanged(async (user) => {
-  //     setUser(user);
-  //     if (user) {
-  //       const userDoc = await getDoc(doc(db, 'users', user.uid));
-  //       if (userDoc.exists()) {
-  //         const data = userDoc.data();
-  //         setUserData(data);
-  //         setIsPremium(data.isPremium || false);
-  //         setPhoneNumber(data.phone || '');
-  //       }
-  //     } else {
-  //       setIsPremium(false);
-  //       setUserData(null);
-  //     }
-  //     setLoading(false);
-  //   });
-  //   return unsubscribe;
-  // }, []);
+  const fetchUserData = async () => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-
-  useEffect(() => {
-  const unsubscribe = auth.onAuthStateChanged(async (currentUser) => {
-    if (currentUser) {
-      setUser(currentUser);
-      const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
-      if (userDoc.exists()) {
-        const data = userDoc.data();
-        setUserData(data);
-        setIsPremium(data.isPremium || false);
-        setPhoneNumber(data.phone || '');
-      }
+    if (user) {
+      setUser(user);
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", user.id)
+        .single();
+      setUserData(profile);
+      setIsPremium(profile.isPremium || false);
+      setPhoneNumber(profile.phone || "");
     } else {
-      setUser(null);
-      setUserData(null);
       setIsPremium(false);
+      setUserData(null);
     }
     setLoading(false);
-  });
+  };
 
-  return unsubscribe;
-}, []);
-
-  // const handleBackendPayment = () => {
-  //   if (!user) {
-  //     Alert.alert(
-  //       "Connexion requise",
-  //       "Veuillez vous connecter pour accéder au contenu premium",
-  //       [
-  //         {
-  //           text: "Annuler",
-  //           style: "cancel"
-  //         },
-  //         { 
-  //           text: "Se connecter", 
-  //           onPress: () => router.push('/login')
-  //         }
-  //       ]
-  //     );
-  //     return;
-  //   }
-
-  //   if (!backendAvailable) {
-  //     Alert.alert(
-  //       "Service indisponible",
-  //       "Le service de paiement est temporairement indisponible. Veuillez réessayer plus tard.",
-  //       [{ text: "OK" }]
-  //     );
-  //     return;
-  //   }
-
-  //   setShowPaymentModal(true);
-  // };
-
-//   const handleBackendPayment = () => {
-//   if (!backendAvailable) {
-//     Alert.alert(
-//       "Service indisponible",
-//       "Le service de paiement est temporairement indisponible. Veuillez réessayer plus tard.",
-//       [{ text: "OK" }]
-//     );
-//     return;
-//   }
-
-//   setShowPaymentModal(true);
-// };
-
-
-// const ensureUser = async () => {
-//   if (!user) {
-//     const currentUser = auth.currentUser;
-//     if (currentUser) {
-//       setUser(currentUser);
-//       const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
-//       if (userDoc.exists()) {
-//         const data = userDoc.data();
-//         setUserData(data);
-//         // setIsPremium(data.isPremium || false);
-//         setPhoneNumber(data.phone || '');
-//       }
-//     } else {
-//       Alert.alert(
-//         "Connexion requise",
-//         "Veuillez vous connecter pour accéder au contenu premium",
-//         [{ text: "OK" }]
-//       );
-//       return false;
-//     }
-//   }
-//   return true;
-// };
+  useEffect(() => {
+    fetchUserData();
+  }, []);
 
 const handleBackendPayment = async () => {
-  //  const userReady = await ensureUser();
-  //  if (!userReady) return;
 
   if (!backendAvailable) {
     Alert.alert("Service indisponible", "Le service de paiement est temporairement indisponible.");
@@ -305,18 +234,21 @@ const handleBackendPayment = async () => {
 
   const processBackendPayment = async (method: string) => {
     if (!backendAvailable) {
-      Alert.alert('Service indisponible', 'Le service de paiement est temporairement indisponible.');
+      Alert.alert(
+        "Service indisponible",
+        "Le service de paiement est temporairement indisponible."
+      );
       return;
     }
 
     if (!phoneNumber) {
-      Alert.alert('Erreur', 'Veuillez entrer votre numéro de téléphone');
+      Alert.alert("Erreur", "Veuillez entrer votre numéro de téléphone");
       return;
     }
 
     const validation = validatePhoneNumber(phoneNumber, method);
     if (!validation.isValid) {
-      Alert.alert('Numéro invalide', validation.message);
+      Alert.alert("Numéro invalide", validation.message);
       return;
     }
 
@@ -324,208 +256,105 @@ const handleBackendPayment = async () => {
     setSelectedMethod(method);
 
     try {
-      const paymentResult = await PaymentService.initiatePayment(
-        1000, // 1000 FCFA
-        phoneNumber,
-        method,
-        user.uid,
-        userData?.email,
-        `${userData?.firstName} ${userData?.lastName}`
-      );
+      const ptn = await makePayment({
+        amount: 1000,
+        serviceNumber: phoneNumber,
+        customerName: `${userData.first_name} ${userData.last_name}`,
+        customerAddress: "Douala",
+        customerEmailaddress: userData.email,
+      });
 
-      if (paymentResult.success && paymentResult.data?.transaction?.reference) {
-        const transactionId = paymentResult.data.transaction.reference;
-        setCurrentTransaction(transactionId);
-        
-        if (paymentResult.paymentUrl) {
-          Alert.alert(
-            'Redirection',
-            'Vous allez être redirigé pour compléter le paiement',
-            [
-              {
-                text: 'Annuler',
-                style: 'cancel',
-                onPress: () => {
-                  setProcessingPayment(false);
-                  setCurrentTransaction('');
-                }
-              },
-              {
-                text: 'Continuer',
-                onPress: async () => {
-                  const canOpen = await Linking.canOpenURL(paymentResult.paymentUrl);
-                  if (canOpen) {
-                    Linking.openURL(paymentResult.paymentUrl)
-                      .catch(err => {
-                        console.error('Erreur ouverture URL:', err);
-                        Alert.alert('Erreur', 'Impossible d\'ouvrir la page de paiement');
-                      });
-                    setShowPaymentModal(false);
-                    startBackendPaymentStatusCheck(transactionId);
-                  } else {
-                    Alert.alert('Erreur', 'Impossible d\'ouvrir le lien de paiement');
-                  }
-                }
-              }
-            ]
-          );
-        } else {
-          Alert.alert(
-            'Paiement initié',
-            'Veuillez confirmer le paiement sur votre téléphone',
-            [
-              {
-                text: 'OK',
-                onPress: () => {
-                  setShowPaymentModal(false);
-                  startBackendPaymentStatusCheck(transactionId);
-                }
-              }
-            ]
-          );
-        }
-      } else {
-        Alert.alert(
-          'Erreur de Paiement', 
-          paymentResult.message || 'Erreur lors de l\'initiation du paiement',
-          [{ text: 'OK' }]
-        );
-      }
+      Alert.alert(
+        "Paiement initié",
+        "Veuillez confirmer le paiement sur votre téléphone",
+        [
+          {
+            text: "OK",
+            onPress: () => {
+              setShowPaymentModal(false);
+              startBackendPaymentStatusCheck(ptn);
+            },
+          },
+        ]
+      );
     } catch (error) {
-      console.error('Erreur paiement backend:', error);
-      Alert.alert('Erreur', 'Une erreur est survenue lors du paiement');
+      console.error("Erreur paiement backend:", error);
+      Alert.alert("Erreur", "Une erreur est survenue lors du paiement");
     } finally {
       setProcessingPayment(false);
     }
   };
 
-  // const startBackendPaymentStatusCheck = async (transactionId: string) => {
-  //   let attempts = 0;
-  //   const maxAttempts = 60; // 60 tentatives sur 5 minutes
-    
-  //   const checkStatus = async () => {
-  //     attempts++;
-  //     const status = await PaymentService.verifyPayment(transactionId);
-      
-  //     if (status.paid) {
-  //       // Paiement réussi - mettre à jour le statut premium dans Firebase
-  //       try {
-  //         if (user) {
-  //           await updateDoc(doc(db, 'users', user.uid), {
-  //             isPremium: true,
-  //             premiumActivatedAt: new Date(),
-  //             lastPaymentDate: new Date()
-  //           });
-            
-  //           Alert.alert('Succès', 'Paiement confirmé! Accès premium activé.');
-  //           setIsPremium(true);
-  //           setCurrentTransaction('');
-  //           router.push('/cultures-premium');
-  //         }
-  //       } catch (error) {
-  //         console.error('Erreur mise à jour statut premium:', error);
-  //         Alert.alert('Succès', 'Paiement confirmé! Redirection...');
-  //         setIsPremium(true);
-  //         setCurrentTransaction('');
-  //         router.push('/cultures-premium');
-  //       }
-  //       return;
-  //     }
-      
-  //     if (status.status === 'failed' || status.status === 'canceled') {
-  //       Alert.alert('Échec', 'Le paiement a échoué ou a été annulé.');
-  //       setCurrentTransaction('');
-  //       return;
-  //     }
-      
-  //     if (attempts < maxAttempts) {
-  //       // Continuer à vérifier toutes les 5 secondes
-  //       setTimeout(checkStatus, 5000);
-  //     } else {
-  //       Alert.alert(
-  //         'Délai dépassé',
-  //         'Le paiement n\'a pas été confirmé dans le délai imparti. Vous serez notifié lorsque le paiement sera traité.',
-  //         [{ 
-  //           text: 'OK',
-  //           onPress: () => setCurrentTransaction('')
-  //         }]
-  //       );
-  //     }
-  //   };
-    
-  //   checkStatus();
-  // };
+  const startBackendPaymentStatusCheck = async (ptn: string) => {
+    let attempts = 0;
+    const maxAttempts = 60; // 60 tentatives sur 5 minutes
+    const interval = setInterval(async () => {
+      const paymentInfo = await getPaymentInfo(ptn);
 
+      const paymentArray = paymentInfo.responseData as unknown as Array<
+        Record<string, unknown>
+      >;
+      const status = paymentArray[0]?.status as string;
+      console.log("Payment status:", status);
 
-  const startBackendPaymentStatusCheck = async (transactionId: string) => {
-  let attempts = 0;
-  const maxAttempts = 60; // 60 tentatives sur 5 minutes
+      if (status != "PENDING") {
+        if (status === "SUCCESS") {
+          console.log("Transaction terminée:", status);
 
-  const checkStatus = async () => {
-    attempts++;
+          await supabase
+            .from("profiles")
+            .update({
+              is_premium: true,
+              last_payment_date: new Date(),
+            })
+            .eq("id", user?.id);
 
-    try {
-      const status = await PaymentService.verifyPayment(transactionId);
-
-      if (status.paid) {
-        // Récupérer l'utilisateur Firebase directement
-        const currentUser = auth.currentUser;
-        if (!currentUser) {
-          Alert.alert('Erreur', 'Utilisateur non connecté. Veuillez vous reconnecter.');
-          setCurrentTransaction('');
-          return;
+          Alert.alert("Succès", "Paiement confirmé! Accès premium activé.");
+          setIsPremium(true);
+          router.push("/cultures-premium");
+        } else {
+          Alert.alert("Error", "Paiement non validé!");
         }
-
-        // Paiement réussi - mettre à jour le statut premium dans Firebase
-        await updateDoc(doc(db, 'users', currentUser.uid), {
-          isPremium: true,
-          premiumActivatedAt: new Date(),
-          lastPaymentDate: new Date(),
-        });
-
-        // Mettre à jour l'état local et rediriger
-        setIsPremium(true);
-        setCurrentTransaction('');
-        Alert.alert('Succès', 'Paiement confirmé! Accès premium activé.');
-        router.push('/cultures-premium');
-        return;
+        clearInterval(interval);
       }
-
-      if (status.status === 'failed' || status.status === 'canceled') {
-        Alert.alert('Échec', 'Le paiement a échoué ou a été annulé.');
-        setCurrentTransaction('');
-        return;
-      }
-
       if (attempts < maxAttempts) {
-        // Continuer à vérifier toutes les 5 secondes
-        setTimeout(checkStatus, 5000);
+        attempts++;
       } else {
+        clearInterval(interval);
         Alert.alert(
-          'Délai dépassé',
-          'Le paiement n\'a pas été confirmé dans le délai imparti. Vous serez notifié lorsque le paiement sera traité.',
-          [{ text: 'OK', onPress: () => setCurrentTransaction('') }]
+          "Délai dépassé",
+          "Le paiement n'a pas été confirmé dans le délai imparti. Vous serez notifié lorsque le paiement sera traité.",
+          [
+            {
+              text: "OK",
+              onPress: () => setCurrentTransaction(""),
+            },
+          ]
         );
       }
-    } catch (error) {
-      console.error('Erreur vérification paiement:', error);
-      if (attempts < maxAttempts) {
-        setTimeout(checkStatus, 5000);
-      } else {
-        Alert.alert('Erreur', 'Impossible de vérifier le paiement. Veuillez réessayer plus tard.');
-        setCurrentTransaction('');
-      }
-    }
+    }, 3000);
   };
 
-  checkStatus();
-};
-
-  const renderItem = ({ item }: { item: { id: string; title: string; description: string; category: string; date: string } }) => {
+  const renderItem = ({
+    item,
+  }: {
+    item: {
+      id: string;
+      title: string;
+      description: string;
+      category: string;
+      date: string;
+    };
+  }) => {
     return (
       <TouchableOpacity style={styles.card} onPress={() => alert(item.title)}>
         <View style={styles.cardHeader}>
-          <View style={[styles.categoryBadge, { backgroundColor: getCategoryColor(item.category) }]}>
+          <View
+            style={[
+              styles.categoryBadge,
+              { backgroundColor: getCategoryColor(item.category) },
+            ]}
+          >
             <Text style={styles.categoryText}>{item.category}</Text>
           </View>
           <Text style={styles.dateText}>{item.date}</Text>
@@ -542,12 +371,12 @@ const handleBackendPayment = async () => {
 
   const getCategoryColor = (category: string) => {
     const colors: { [key: string]: string } = {
-      'Culture': '#E67E22',
-      'Événement': '#9B59B6',
-      'Gastronomie': '#27AE60',
-      'Tradition': '#2980B9',
+      Culture: "#E67E22",
+      Événement: "#9B59B6",
+      Gastronomie: "#27AE60",
+      Tradition: "#2980B9",
     };
-    return colors[category] || '#34495E';
+    return colors[category] || "#34495E";
   };
 
   const renderPaymentModal = () => (
@@ -561,7 +390,7 @@ const handleBackendPayment = async () => {
         <View style={styles.modalContent}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Paiement Premium</Text>
-            <TouchableOpacity 
+            <TouchableOpacity
               onPress={() => setShowPaymentModal(false)}
               style={styles.closeButton}
             >
@@ -570,7 +399,8 @@ const handleBackendPayment = async () => {
           </View>
 
           <Text style={styles.modalDescription}>
-            Choisissez votre méthode de paiement et entrez votre numéro de téléphone
+            Choisissez votre méthode de paiement et entrez votre numéro de
+            téléphone
           </Text>
 
           <View style={styles.phoneInputContainer}>
@@ -594,7 +424,7 @@ const handleBackendPayment = async () => {
                 key={method.id}
                 style={[
                   styles.paymentMethodButton,
-                  processingPayment && { opacity: 0.6 }
+                  processingPayment && { opacity: 0.6 },
                 ]}
                 onPress={() => processBackendPayment(method.id)}
                 disabled={processingPayment}
@@ -621,9 +451,9 @@ const handleBackendPayment = async () => {
           <View style={styles.paymentInstructions}>
             <Text style={styles.instructionsTitle}>Instructions:</Text>
             <Text style={styles.instructionsText}>
-              1. Choisissez votre opérateur{'\n'}
-              2. Entrez votre numéro{'\n'}
-              3. Confirmez le paiement sur votre mobile{'\n'}
+              1. Choisissez votre opérateur{"\n"}
+              2. Entrez votre numéro{"\n"}
+              3. Confirmez le paiement sur votre mobile{"\n"}
               4. Attendez la confirmation automatique
             </Text>
           </View>
@@ -643,7 +473,7 @@ const handleBackendPayment = async () => {
 
   return (
     <ImageBackground
-      source={require('@/assets/images/a.jpg')}
+      source={require("@/assets/images/a.jpg")}
       style={styles.background}
       resizeMode="cover"
     >
@@ -681,7 +511,8 @@ const handleBackendPayment = async () => {
             </View>
             <Text style={styles.featuredTitle}>Le Festival Ngondo 2024</Text>
             <Text style={styles.featuredDescription}>
-              La plus grande célébration culturelle Sawa revient avec des traditions ancestrales...
+              La plus grande célébration culturelle Sawa revient avec des
+              traditions ancestrales...
             </Text>
           </View>
         </View>
@@ -695,9 +526,10 @@ const handleBackendPayment = async () => {
               </View>
               <Text style={styles.premiumTitle}>Contenu Premium</Text>
               <Text style={styles.premiumDescription}>
-                Débloquez l'accès complet à toutes les cultures du Cameroun avec des détails exclusifs, photos et vidéos.
+                Débloquez l'accès complet à toutes les cultures du Cameroun avec
+                des détails exclusifs, photos et vidéos.
               </Text>
-              
+
               <View style={styles.pricingContainer}>
                 <Text style={styles.originalPrice}>2000 FCFA</Text>
                 <Text style={styles.discountedPrice}>1000 FCFA</Text>
@@ -706,11 +538,13 @@ const handleBackendPayment = async () => {
                 </View>
               </View>
 
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[
-                  styles.paymentButton, 
-                  (!backendAvailable || processingPayment) && { backgroundColor: '#aaa' }
-                ]} 
+                  styles.paymentButton,
+                  (!backendAvailable || processingPayment) && {
+                    backgroundColor: "#aaa",
+                  },
+                ]}
                 onPress={handleBackendPayment}
                 disabled={!backendAvailable || processingPayment}
               >
@@ -719,19 +553,27 @@ const handleBackendPayment = async () => {
                 ) : !backendAvailable ? (
                   <>
                     <Ionicons name="warning" size={20} color="#FFF" />
-                    <Text style={styles.paymentButtonText}>Service indisponible</Text>
+                    <Text style={styles.paymentButtonText}>
+                      Service indisponible
+                    </Text>
                   </>
                 ) : (
                   <>
                     <Ionicons name="card" size={20} color="#FFF" />
-                    <Text style={styles.paymentButtonText}>Payer 1000 FCFA</Text>
+                    <Text style={styles.paymentButtonText}>
+                      Payer 1000 FCFA
+                    </Text>
                   </>
                 )}
               </TouchableOpacity>
 
               {!backendAvailable && (
                 <View style={styles.warningBox}>
-                  <Ionicons name="information-circle" size={16} color="#E67E22" />
+                  <Ionicons
+                    name="information-circle"
+                    size={16}
+                    color="#E67E22"
+                  />
                   <Text style={styles.warningText}>
                     Le service de paiement est temporairement indisponible
                   </Text>
@@ -739,16 +581,22 @@ const handleBackendPayment = async () => {
               )}
 
               <View style={styles.paymentMethodsPreview}>
-                <Text style={styles.paymentMethodsTitle}>Paiements sécurisés:</Text>
+                <Text style={styles.paymentMethodsTitle}>
+                  Paiements sécurisés:
+                </Text>
                 <View style={styles.paymentMethodsIcons}>
                   <Text style={styles.paymentMethodPreview}>📱 MTN Money</Text>
-                  <Text style={styles.paymentMethodPreview}>🍊 Orange Money</Text>
+                  <Text style={styles.paymentMethodPreview}>
+                    🍊 Orange Money
+                  </Text>
                 </View>
               </View>
 
               <View style={styles.securityBadge}>
                 <Ionicons name="shield-checkmark" size={14} color="#27AE60" />
-                <Text style={styles.securityTextSmall}>Sécurisé par NotchPay</Text>
+                <Text style={styles.securityTextSmall}>
+                  Sécurisé par NotchPay
+                </Text>
               </View>
 
               <View style={styles.featuresList}>
@@ -781,9 +629,14 @@ const handleBackendPayment = async () => {
               <Text style={styles.premiumDescription}>
                 Profitez de l'accès complet à toutes les cultures du Cameroun.
               </Text>
-              <TouchableOpacity style={styles.paymentButton} onPress={() => router.push('/cultures-premium')}>
+              <TouchableOpacity
+                style={styles.paymentButton}
+                onPress={() => router.push("/cultures-premium")}
+              >
                 <Ionicons name="arrow-forward" size={20} color="#FFF" />
-                <Text style={styles.paymentButtonText}>Accéder aux cultures</Text>
+                <Text style={styles.paymentButtonText}>
+                  Accéder aux cultures
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -838,35 +691,35 @@ const handleBackendPayment = async () => {
 }
 
 const styles = StyleSheet.create({
-  background: { 
+  background: {
     flex: 1,
   },
-  scrollContainer: { 
-    flexGrow: 1, 
+  scrollContainer: {
+    flexGrow: 1,
     padding: 20,
   },
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#FFF8DC',
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#FFF8DC",
   },
   loadingText: {
     marginTop: 10,
     fontSize: 16,
-    color: '#8B0000',
+    color: "#8B0000",
   },
   header: {
     marginBottom: 30,
-    alignItems: 'center',
+    alignItems: "center",
   },
   headerContent: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 240, 0.95)',
+    alignItems: "center",
+    backgroundColor: "rgba(255, 255, 240, 0.95)",
     padding: 20,
     borderRadius: 20,
-    width: Dimensions.get('window').width - 40,
-    shadowColor: '#000',
+    width: Dimensions.get("window").width - 40,
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -874,45 +727,45 @@ const styles = StyleSheet.create({
   },
   appTitle: {
     fontSize: 36,
-    fontWeight: '800',
-    color: '#8B0000',
+    fontWeight: "800",
+    color: "#8B0000",
     marginBottom: 5,
-    textAlign: 'center',
+    textAlign: "center",
   },
   subtitle: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#4B0082',
+    fontWeight: "600",
+    color: "#4B0082",
     marginBottom: 15,
-    textAlign: 'center',
+    textAlign: "center",
   },
   statsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
+    flexDirection: "row",
+    justifyContent: "center",
     gap: 20,
   },
   statItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 5,
   },
   statText: {
     fontSize: 14,
-    color: '#333',
-    fontWeight: '500',
+    color: "#333",
+    fontWeight: "500",
   },
   premiumBadgeHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#8B0000',
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#8B0000",
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 15,
     marginTop: 10,
   },
   premiumBadgeText: {
-    color: '#FFD700',
-    fontWeight: '700',
+    color: "#FFD700",
+    fontWeight: "700",
     fontSize: 12,
     marginLeft: 5,
   },
@@ -921,130 +774,130 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 22,
-    fontWeight: '700',
-    color: '#8B0000',
+    fontWeight: "700",
+    color: "#8B0000",
     marginBottom: 15,
   },
   featuredCard: {
-    backgroundColor: 'rgba(139, 0, 0, 0.9)',
+    backgroundColor: "rgba(139, 0, 0, 0.9)",
     borderRadius: 15,
     padding: 20,
-    position: 'relative',
-    shadowColor: '#000',
+    position: "relative",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.4,
     shadowRadius: 8,
     elevation: 8,
   },
   featuredBadge: {
-    position: 'absolute',
+    position: "absolute",
     top: -10,
     right: 20,
-    backgroundColor: '#FFD700',
+    backgroundColor: "#FFD700",
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 12,
   },
   featuredBadgeText: {
     fontSize: 12,
-    fontWeight: '700',
-    color: '#8B0000',
+    fontWeight: "700",
+    color: "#8B0000",
   },
   featuredTitle: {
     fontSize: 20,
-    fontWeight: '700',
-    color: '#FFF',
+    fontWeight: "700",
+    color: "#FFF",
     marginBottom: 8,
   },
   featuredDescription: {
     fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.9)',
+    color: "rgba(255, 255, 255, 0.9)",
     lineHeight: 20,
   },
   premiumSection: {
     marginBottom: 30,
   },
   premiumCard: {
-    backgroundColor: 'rgba(255, 255, 240, 0.95)',
+    backgroundColor: "rgba(255, 255, 240, 0.95)",
     borderRadius: 20,
     padding: 25,
-    alignItems: 'center',
-    shadowColor: '#000',
+    alignItems: "center",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
     borderWidth: 2,
-    borderColor: '#FFD700',
-    position: 'relative',
+    borderColor: "#FFD700",
+    position: "relative",
   },
   premiumBadge: {
-    position: 'absolute',
+    position: "absolute",
     top: -15,
-    alignSelf: 'center',
-    backgroundColor: '#8B0000',
+    alignSelf: "center",
+    backgroundColor: "#8B0000",
     padding: 10,
     borderRadius: 50,
     borderWidth: 3,
-    borderColor: '#FFD700',
+    borderColor: "#FFD700",
   },
   premiumTitle: {
     fontSize: 24,
-    fontWeight: '800',
-    color: '#8B0000',
+    fontWeight: "800",
+    color: "#8B0000",
     marginTop: 20,
     marginBottom: 10,
-    textAlign: 'center',
+    textAlign: "center",
   },
   premiumDescription: {
     fontSize: 16,
-    color: '#333',
-    textAlign: 'center',
+    color: "#333",
+    textAlign: "center",
     lineHeight: 22,
     marginBottom: 20,
   },
   pricingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 20,
-    position: 'relative',
+    position: "relative",
   },
   originalPrice: {
     fontSize: 18,
-    color: '#999',
-    textDecorationLine: 'line-through',
+    color: "#999",
+    textDecorationLine: "line-through",
     marginRight: 10,
   },
   discountedPrice: {
     fontSize: 28,
-    fontWeight: '800',
-    color: '#27AE60',
+    fontWeight: "800",
+    color: "#27AE60",
   },
   discountBadge: {
-    position: 'absolute',
+    position: "absolute",
     right: -50,
     top: -10,
-    backgroundColor: '#E74C3C',
+    backgroundColor: "#E74C3C",
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 8,
   },
   discountText: {
     fontSize: 12,
-    fontWeight: '700',
-    color: '#FFF',
+    fontWeight: "700",
+    color: "#FFF",
   },
   paymentButton: {
-    backgroundColor: '#27AE60',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: "#27AE60",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     paddingVertical: 15,
     paddingHorizontal: 30,
     borderRadius: 50,
-    width: '100%',
+    width: "100%",
     marginBottom: 20,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 4,
@@ -1052,81 +905,81 @@ const styles = StyleSheet.create({
   },
   paymentButtonText: {
     fontSize: 18,
-    fontWeight: '700',
-    color: '#FFF',
+    fontWeight: "700",
+    color: "#FFF",
     marginLeft: 10,
   },
   warningBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(230, 126, 34, 0.1)',
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(230, 126, 34, 0.1)",
     padding: 12,
     borderRadius: 10,
     marginBottom: 15,
     borderWidth: 1,
-    borderColor: 'rgba(230, 126, 34, 0.3)',
+    borderColor: "rgba(230, 126, 34, 0.3)",
   },
   warningText: {
     fontSize: 12,
-    color: '#E67E22',
-    fontWeight: '500',
+    color: "#E67E22",
+    fontWeight: "500",
     marginLeft: 8,
     flex: 1,
   },
   featuresList: {
-    width: '100%',
+    width: "100%",
   },
   featureItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 10,
     paddingHorizontal: 10,
   },
   featureText: {
     fontSize: 14,
-    color: '#333',
+    color: "#333",
     marginLeft: 10,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   newsSection: {
     marginBottom: 30,
   },
   sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 15,
   },
   seeAllButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 4,
   },
   seeAllText: {
     fontSize: 14,
-    color: '#8B0000',
-    fontWeight: '600',
+    color: "#8B0000",
+    fontWeight: "600",
   },
   listContent: {
     paddingBottom: 10,
   },
   card: {
-    backgroundColor: 'rgba(255, 255, 240, 0.95)',
+    backgroundColor: "rgba(255, 255, 240, 0.95)",
     borderRadius: 15,
     padding: 18,
     marginBottom: 15,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.25,
     shadowRadius: 6,
     elevation: 6,
     borderLeftWidth: 4,
-    borderLeftColor: '#8B0000',
+    borderLeftColor: "#8B0000",
   },
   cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 10,
   },
   categoryBadge: {
@@ -1136,53 +989,53 @@ const styles = StyleSheet.create({
   },
   categoryText: {
     fontSize: 12,
-    fontWeight: '700',
-    color: '#FFF',
+    fontWeight: "700",
+    color: "#FFF",
   },
   dateText: {
     fontSize: 12,
-    color: '#666',
-    fontWeight: '500',
+    color: "#666",
+    fontWeight: "500",
   },
   cardTitle: {
     fontSize: 17,
-    fontWeight: '700',
-    color: '#8B0000',
+    fontWeight: "700",
+    color: "#8B0000",
     marginBottom: 8,
     lineHeight: 22,
   },
   cardDescription: {
     fontSize: 14,
-    color: '#333',
+    color: "#333",
     lineHeight: 20,
     marginBottom: 12,
   },
   cardFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 6,
   },
   readTime: {
     fontSize: 12,
-    color: '#666',
-    fontWeight: '500',
+    color: "#666",
+    fontWeight: "500",
   },
   actionsSection: {
     marginBottom: 20,
   },
   actionsGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    flexWrap: "wrap",
     gap: 15,
   },
   actionButton: {
-    backgroundColor: 'rgba(255, 255, 240, 0.95)',
+    backgroundColor: "rgba(255, 255, 240, 0.95)",
     borderRadius: 15,
     padding: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
@@ -1191,41 +1044,41 @@ const styles = StyleSheet.create({
   actionText: {
     marginTop: 8,
     fontSize: 14,
-    fontWeight: '600',
-    color: '#8B0000',
-    textAlign: 'center',
+    fontWeight: "600",
+    color: "#8B0000",
+    textAlign: "center",
   },
   // Styles pour le modal de paiement
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
   },
   modalContent: {
-    backgroundColor: '#FFF8DC',
+    backgroundColor: "#FFF8DC",
     borderRadius: 20,
     padding: 25,
-    width: Dimensions.get('window').width - 40,
-    maxHeight: Dimensions.get('window').height - 100,
+    width: Dimensions.get("window").width - 40,
+    maxHeight: Dimensions.get("window").height - 100,
   },
   modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 15,
   },
   modalTitle: {
     fontSize: 22,
-    fontWeight: '700',
-    color: '#8B0000',
+    fontWeight: "700",
+    color: "#8B0000",
   },
   closeButton: {
     padding: 5,
   },
   modalDescription: {
     fontSize: 14,
-    color: '#333',
+    color: "#333",
     marginBottom: 20,
     lineHeight: 20,
   },
@@ -1234,37 +1087,37 @@ const styles = StyleSheet.create({
   },
   inputLabel: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#8B0000',
+    fontWeight: "600",
+    color: "#8B0000",
     marginBottom: 8,
   },
   phoneInput: {
     borderWidth: 1,
-    borderColor: '#8B0000',
+    borderColor: "#8B0000",
     borderRadius: 10,
     paddingHorizontal: 15,
     height: 50,
-    backgroundColor: '#FFF',
+    backgroundColor: "#FFF",
     fontSize: 16,
   },
   phoneHint: {
     fontSize: 12,
-    color: '#666',
+    color: "#666",
     marginTop: 5,
-    fontStyle: 'italic',
+    fontStyle: "italic",
   },
   paymentMethods: {
     marginBottom: 20,
   },
   paymentMethodButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFF',
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFF",
     borderRadius: 12,
     padding: 15,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: "#E0E0E0",
   },
   paymentMethodIcon: {
     fontSize: 24,
@@ -1275,74 +1128,74 @@ const styles = StyleSheet.create({
   },
   paymentMethodName: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
+    fontWeight: "600",
+    color: "#333",
   },
   paymentMethodAmount: {
     fontSize: 14,
-    color: '#8B0000',
-    fontWeight: '700',
+    color: "#8B0000",
+    fontWeight: "700",
   },
   securityNotice: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     marginTop: 15,
     padding: 10,
-    backgroundColor: 'rgba(39, 174, 96, 0.1)',
+    backgroundColor: "rgba(39, 174, 96, 0.1)",
     borderRadius: 8,
   },
   securityText: {
     fontSize: 12,
-    color: '#27AE60',
-    fontWeight: '600',
+    color: "#27AE60",
+    fontWeight: "600",
     marginLeft: 5,
   },
   paymentInstructions: {
     marginTop: 15,
     padding: 15,
-    backgroundColor: 'rgba(139, 0, 0, 0.05)',
+    backgroundColor: "rgba(139, 0, 0, 0.05)",
     borderRadius: 10,
   },
   instructionsTitle: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#8B0000',
+    fontWeight: "600",
+    color: "#8B0000",
     marginBottom: 8,
   },
   instructionsText: {
     fontSize: 12,
-    color: '#333',
+    color: "#333",
     lineHeight: 18,
   },
   paymentMethodsPreview: {
     marginBottom: 15,
-    alignItems: 'center',
+    alignItems: "center",
   },
   paymentMethodsTitle: {
     fontSize: 12,
-    color: '#666',
+    color: "#666",
     marginBottom: 8,
   },
   paymentMethodsIcons: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 15,
   },
   paymentMethodPreview: {
     fontSize: 12,
-    color: '#8B0000',
-    fontWeight: '500',
+    color: "#8B0000",
+    fontWeight: "500",
   },
   securityBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     marginTop: 10,
   },
   securityTextSmall: {
     fontSize: 10,
-    color: '#27AE60',
-    fontWeight: '500',
+    color: "#27AE60",
+    fontWeight: "500",
     marginLeft: 3,
   },
 });
